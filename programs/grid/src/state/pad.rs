@@ -13,22 +13,30 @@ macro_rules! read_u16 {
         unsafe { *(($data).as_ptr().add($offset) as *const u16) }
     };
 }
+macro_rules! read_u32 {
+    ($data:expr, $offset:expr) => {
+        unsafe { *(($data).as_ptr().add($offset) as *const u32) }
+    };
+}
 
 pub fn add_cell_to_pad(mut data: RefMut<&mut [u8]>, cell_id: u32, pos: &CellPos) {
     // cell id 32
     // cell pos 48
-    // tot 80
-
     let size = 80;
+
+    let max = data.len() / size;
 
     // read length
     let len = read_u16!(data, 0) as usize;
+    if len == max {
+        panic!("no space left in pad");
+    }
 
     for idx in 0..len {
         let i = idx * size;
-        let r = read_u16!(data, i+8);
         let x = read_u16!(data, i+4);
         let y = read_u16!(data, i+6);
+        let r = read_u16!(data, i+8);
 
         if pos.overlaps(x, y, r) {
             panic!("overlaps");
@@ -44,9 +52,33 @@ pub fn add_cell_to_pad(mut data: RefMut<&mut [u8]>, cell_id: u32, pos: &CellPos)
 
     // update len
     write_bytes!(data, 0, (len+1) as u16);
+}
 
-    // if we are here thats bad
-    panic!("pad is full");
+pub fn remove_cell_from_pad(mut data: RefMut<&mut [u8]>, cell_id: u32) {
+    // cell id 32
+    // cell pos 48
+    let size = 80;
+
+    let max = data.len() / size;
+
+    // read length
+    let len = read_u16!(data, 0) as usize;
+    if len == max {
+        panic!("no space left in pad");
+    }
+
+    for idx in 0..len {
+        let id = read_u32!(data, idx * size);
+
+        if id == cell_id {
+            // TODO
+            // update len
+            write_bytes!(data, 0, (len-1) as u16);
+            return;
+        }
+    }
+
+    panic!("cell not found in pad");
 }
 
 

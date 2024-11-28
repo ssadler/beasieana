@@ -5,9 +5,8 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-beastieana = "4M9GhRRrJAwDZph7ybJWLEYT1tN5xY3MTiW3QtRFVBVD"
-board = "EGphNMLtdsM4EkuhY1XkhUBfSq1bDShHp5ejpdEv5s8n"
-wat = "HTc63wyca9jx7tbfLUMra2TAEmaE425WXw8KevhP8Z5V"
+beastie = "8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU"
+grid = "EExeRoQMrfcJP28XQVjcE6khh3U8GC2RVZs28RNut5Br"
 
 [registry]
 url = "https://api.apr.dev"

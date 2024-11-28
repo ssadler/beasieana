@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 #[account]
 pub struct Board {
+    pub owner: Pubkey,
+    pub seed: u64,
     pub config: BoardConfig,
     pub prev_cell_id: u32
 }
