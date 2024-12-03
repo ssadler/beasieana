@@ -1,19 +1,28 @@
 use anchor_lang::prelude::*;
+use beastie_common::Beastie;
+
+mod proxy;
+mod utils;
+mod transfer;
+
+use utils::*;
+use proxy::*;
+use transfer::*;
 
 declare_id!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");
 
-static BEASTIE_KEY: &[u8] = b"asset.beastie";
 
-macro_rules! byte_ref {
-    ($val:expr, $size:expr) => {
-        unsafe { &*(std::ptr::addr_of!($val) as *const [u8; $size]) }
-    };
+#[derive(Accounts)]
+struct SayTest {
 }
-
 
 #[program]
 pub mod beastie {
     use super::*;
+
+    pub fn say_test(ctx: Context<SayTest>) -> Result<()> {
+        Ok(())
+    }
 
     pub fn create_beastie(ctx: Context<CreateBeastie>, seed: u64, owner: Pubkey) -> Result<()> {
 
@@ -49,26 +58,12 @@ pub mod beastie {
         grid::cpi::init_beastie(cpi, seed)
     }
 
-    pub fn send_token(ctx: Context<SendToken>, amount: u64) -> Result<()> {
-
-        let beastie = &ctx.accounts.beastie;
-        let seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8), &[beastie.bump]];
-        let signer_seeds = &[&seeds[..]];
-        let cpi_context = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            SplTransfer {
-                from: ctx.accounts.beastie_ata.to_account_info(),
-                to: ctx.accounts.dest_ata.to_account_info(),
-                authority: ctx.accounts.beastie.to_account_info(),
-            },
-            signer_seeds
-        );
-        
-        token::transfer(cpi_context, amount)
+    pub fn proxy(ctx: Context<ProxyCall>, data: Vec<u8>, accounts: Vec<AccMeta>) -> Result<()> {
+        crate::proxy::proxy(ctx, data, accounts)
     }
 
-    pub fn forward(ctx: Context<ForwardCall>) -> Result<()> {
-        Ok(())
+    pub fn transfer_ownership(ctx: Context<Transfer>, new_owner: Pubkey) -> Result<()> {
+        crate::transfer::transfer(ctx, new_owner)
     }
 }
 
@@ -101,51 +96,44 @@ pub struct CreateBeastie<'info> {
     pub grid_program: Program<'info, Grid>,
 }
 
-#[account]
-pub struct Beastie {
-    pub bump: u8,
-    pub seed: u64,
-    pub creation_slot: u64,
-    pub owner: Pubkey,
-    pub placements: Vec<Pubkey>,
-}
 
 
-#[derive(Accounts)]
-pub struct ForwardCall<'info> {
-    #[account(
-        seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8)],
-        bump,
-        constraint = &beastie.owner == owner.key
-    )]
-    pub beastie: Account<'info, Beastie>,
-
-    #[account(mut)]
-    pub owner: Signer<'info>,
-
-    #[account(mut)]
-    pub payer: Signer<'info>,
-}
-
-use anchor_spl::token::{self, Token, TokenAccount, Transfer as SplTransfer};
-
-
-
-#[derive(Accounts)]
-pub struct SendToken<'info> {
-    #[account(
-        seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8)],
-        bump,
-        constraint = &beastie.owner == owner.key,
-    )]
-    pub beastie: Account<'info, Beastie>,
-
-    #[account(mut)]
-    pub beastie_ata: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub dest_ata: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
-
-    #[account()]
-    pub owner: Signer<'info>,
-}
+// use anchor_spl::token::{self, Token, TokenAccount, Transfer as SplTransfer};
+// 
+// 
+//     pub fn send_token(ctx: Context<SendToken>, amount: u64) -> Result<()> {
+// 
+//         let beastie = &ctx.accounts.beastie;
+//         let seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8), &[beastie.bump]];
+//         let signer_seeds = &[&seeds[..]];
+//         let cpi_context = CpiContext::new_with_signer(
+//             ctx.accounts.token_program.to_account_info(),
+//             SplTransfer {
+//                 from: ctx.accounts.beastie_ata.to_account_info(),
+//                 to: ctx.accounts.dest_ata.to_account_info(),
+//                 authority: ctx.accounts.beastie.to_account_info(),
+//             },
+//             signer_seeds
+//         );
+//         
+//         token::transfer(cpi_context, amount)
+//     }
+// 
+// #[derive(Accounts)]
+// pub struct SendToken<'info> {
+//     #[account(
+//         seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8)],
+//         bump,
+//         constraint = &beastie.owner == owner.key,
+//     )]
+//     pub beastie: Account<'info, Beastie>,
+// 
+//     #[account(mut)]
+//     pub beastie_ata: Account<'info, TokenAccount>,
+//     #[account(mut)]
+//     pub dest_ata: Account<'info, TokenAccount>,
+//     pub token_program: Program<'info, Token>,
+// 
+//     #[account()]
+//     pub owner: Signer<'info>,
+// }

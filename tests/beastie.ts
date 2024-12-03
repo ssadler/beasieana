@@ -1,38 +1,49 @@
 import * as anchor from "@coral-xyz/anchor"
-import { createBeastie } from './common'
-import {assert} from "chai";
+import { buildProxy, createBeastie } from './common'
+import {assert, expect} from "chai";
+
+import * as Token from "@solana/spl-token";
 
 describe("beastie", () => {
   let provider = anchor.AnchorProvider.env()
   anchor.setProvider(provider)
+  const owner = provider.wallet as anchor.Wallet
 
   it("Create Beastie", async () => {
 
-    const owner = provider.wallet as anchor.Wallet
     let r = await createBeastie(10, owner.publicKey)
 
-    assert.equal(r.seed.toNumber(), 10)
-    assert.equal(r.owner.toString(), owner.publicKey.toString())
-
-    //let instruction = program.methods.createBeastie(new anchor.BN(1), owner.publicKey)
-
-    //let accts = await instruction.pubkeys()
-    //await instruction.rpc()
-    //let r = await program.account.beastie.fetch(accts['beastie'])
-
-    //assert.equal(r.seed.toNumber(), 1)
-    //assert.equal(r.owner.toString(), owner.publicKey.toString())
-
-    //try {
-    //  let rand = anchor.web3.Keypair.generate()
-    //  await program.methods.forward()
-    //    .accountsPartial({
-    //      beastie: accts['beastie'],
-    //      owner: rand.publicKey
-    //    })
-    //    .signers([rand])
-    //    .rpc()
-    //  assert.fail("forward with wrong owner didnt fail")
-    //} catch {}
+    assert.equal(r.beastie.seed.toNumber(), 10)
+    assert.equal(r.beastie.owner.toString(), owner.publicKey.toString())
   })
+
+  const wallet = provider.wallet as anchor.Wallet
+
+  it("Sends Token", async () => {
+
+    const b = await createBeastie()
+
+    const mintAuthority = anchor.web3.Keypair.generate()
+    const mint = await Token.createMint(
+      provider.connection,
+      wallet.payer,
+      mintAuthority.publicKey,
+      null,
+      9
+    )
+    let beastieATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, wallet.payer, mint, b.address, true)
+    await Token.mintTo(provider.connection, wallet.payer, mint, beastieATA.address, mintAuthority, 102)
+
+    let walletATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, wallet.payer, mint, wallet.publicKey)
+
+    let transfer = Token.createTransferInstruction(beastieATA.address, walletATA.address, b.address, 101)
+    await buildProxy(b.address, transfer).rpc()
+
+    walletATA = await Token.getAccount(provider.connection, walletATA.address)
+    expect(walletATA.amount.toString()).to.equal("101")
+
+    beastieATA = await Token.getAccount(provider.connection, beastieATA.address)
+    expect(beastieATA.amount.toString()).to.equal("1")
+  })
+
 })

@@ -1,16 +1,23 @@
 use anchor_lang::prelude::*;
 
+use crate::CellPos;
+
+
 #[account]
 pub struct Board {
-    pub owner: Pubkey,
+    pub bump: u8,
     pub seed: u64,
+    pub token: Pubkey,
+    pub owner: Pubkey,
     pub config: BoardConfig,
-    pub prev_cell_id: u32
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub struct BoardConfig {
-    pub rental_price: u32,
+    pub rate: u64,
+    pub add_cell_min_value: u64,
+    pub min_radius: u16,
+    pub max_radius: u16,
     pub width: u32,
     pub height: u32
 }
@@ -19,5 +26,9 @@ impl Board {
     pub fn create(&mut self, config: BoardConfig) -> Result<()> {
         self.config = config;
         Ok(())
+    }
+
+    pub fn get_billing_rate(&self, pos: &CellPos) -> u64 {
+        return self.config.rate * pos.area()
     }
 }

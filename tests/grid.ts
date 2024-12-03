@@ -1,20 +1,21 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Grid } from "../target/types/grid";
-import { Beastie } from "../target/types/beastie";
-import { createBeastie } from './common'
-
 import * as Token from "@solana/spl-token";
+import { buildProxy, createBeastie, gridApp } from './common'
 import {assert} from "chai";
+
 
 describe("grid", () => {
   // Configure the client to use the local cluster.
   let provider = anchor.AnchorProvider.env()
   anchor.setProvider(provider)
+  const owner = provider.wallet as anchor.Wallet
 
-  const wallet = provider.wallet as anchor.Wallet
 
-  //const progGrid = anchor.workspace.Grid as anchor.Program<Grid>
-  const progBeastie = anchor.workspace.Beastie as anchor.Program<Beastie>
+
+  it("Admin Init", async () => {
+    await new Promise((r) => setTimeout(r, 2000))
+    await gridApp.methods.adminInit().rpc()
+  })
 
 
   it("Init Beastie", async () => {
@@ -27,111 +28,86 @@ describe("grid", () => {
   })
 
 
-  it("Sends Token", async () => {
+  const mintAuthority = anchor.web3.Keypair.generate()
+  let mint: anchor.web3.PublicKey
 
-    const b = await createBeastie()
-
-    const mintAuthority = anchor.web3.Keypair.generate()
-    const mint = await Token.createMint(
+  it("Whitelist token", async () => {
+    mint = await Token.createMint(
       provider.connection,
-      wallet.payer,
+      owner.payer,
       mintAuthority.publicKey,
       null,
       9
     )
-    let beastieATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, wallet.payer, mint, b.address, true)
-    await Token.mintTo(provider.connection, wallet.payer, mint, beastieATA.address, mintAuthority, 100)
+    await gridApp.methods.adminWhitelistToken(mint).rpc()
+  })
 
-    let walletATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, wallet.payer, mint, wallet.publicKey)
+  let board: anchor.web3.PublicKey
 
-    let call = progBeastie.methods.sendToken(new anchor.BN(100))
+  it("Create Board", async () => {
+    let config = {
+      rate: new anchor.BN(1),
+      width: 1024,
+      height: 1024,
+      addCellMinValue: new anchor.BN(100000),
+      minRadius: 64,
+      maxRadius: 512
+    }
+    let call = gridApp.methods
+      .createBoard(new anchor.BN(1), owner.publicKey, mint, config)
       .accountsPartial({
-        beastieAta: beastieATA.address,
-        destAta: walletATA.address,
-        beastie: b.address
+        tokenMint: mint
       })
-
-    //console.log(await call.pubkeys())
-
+    board = (await call.pubkeys()).board
     await call.rpc()
   })
 
 
-  //it("Is initialized!", async () => {
-  //  const boardKeypair = anchor.web3.Keypair.generate()
-  //  const owner = provider.wallet
+  it("Place beastie", async () => {
+    let beastie = await createBeastie(3)
 
-  //  const tx = await program.methods
-  //    .createBoard({
-  //      rentalPrice: 1,
-  //      width: 1024,
-  //      height: 1024,
-  //    })
-  //    .accounts({
-  //      owner: owner.publicKey,
-  //      board: boardKeypair.publicKey
-  //    })
-  //    .signers([boardKeypair])
-  //    .rpc()
-  //  console.log("Your transaction signature", tx)
-  //})
+    let beastieATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, owner.payer, mint, beastie.address, true)
+    await Token.mintTo(provider.connection, owner.payer, mint, beastieATA.address, mintAuthority, 1000000)
 
-  //it("Adds cell to pad", async () => {
-  //  const gridKeypair = anchor.web3.Keypair.generate()
-  //  const boardKeypair = anchor.web3.Keypair.generate()
-  //  const mintAuthority = anchor.web3.Keypair.generate()
-  //  const owner = provider.wallet as anchor.Wallet
+    let pos = { x: 200, y: 200, r: 200 }
+    let placeCall = gridApp.methods
+      .place(pos)
+      .accountsPartial({
+        assetBeastie: beastie.address,
+        gridBeastie: beastie.gridBeastie.address,
+        board,
+        tokenMint: mint
+      })
+      .remainingAccounts(
+        getPadATAs(board, pos).map((pubkey) => ({ isSigner: false, isWritable: true, pubkey }))
+      )
 
-  //  const mint = await Token.createMint(
-  //    provider.connection,
-  //    owner.payer,
-  //    mintAuthority.publicKey,
-  //    null,
-  //    9
-  //  )
-
-
-
-
-  //  await program.methods
-  //    .createBoard({
-  //      rentalPrice: 1,
-  //      width: 1024,
-  //      height: 1024,
-  //    })
-  //    .accounts({
-  //      board: boardKeypair.publicKey,
-  //      owner: owner.publicKey,
-  //    })
-  //    .signers([boardKeypair])
-  //    .rpc()
-
-  //  await program.methods
-  //    .createGrid()
-  //    .accounts({
-  //      grid: gridKeypair.publicKey,
-  //      owner: owner.publicKey,
-  //    })
-  //    .signers([gridKeypair])
-  //    .rpc()
-
-  //  let seeds = ["pad", "0", "0"].map((s) => Buffer.from(s))
-  //  let [padPubKey, _] = anchor.web3.PublicKey.findProgramAddressSync(seeds, program.programId)
-
-  //  const beastieKeypair = anchor.web3.Keypair.generate()
-  //  await program.methods
-  //    .place(100, 100, 40)
-  //    .accounts({
-  //      grid: gridKeypair.publicKey,
-  //      board: boardKeypair.publicKey,
-  //      owner: owner.publicKey,
-  //      beastie: beastieKeypair.publicKey,
-  //    })
-  //    .remainingAccounts([
-  //      { isSigner: false, isWritable: true, pubkey: padPubKey }
-  //    ])
-  //    .signers([beastieKeypair])
-  //    .rpc()
-
-  //})
+    await buildProxy(beastie.address, await placeCall.instruction()).rpc()
+  })
 })
+
+
+
+function getPadATAs(board: anchor.web3.PublicKey, pos: { x: number, y: number, r: number }) {
+  let xmin = (pos.x - pos.r) >> 9;
+  let xmax = (pos.x + pos.r) >> 9;
+  let ymin = (pos.y - pos.r) >> 9;
+  let ymax = (pos.y + pos.r) >> 9;
+
+  let out = []
+  
+  for (let xx=xmin; xx<=xmax; xx++) {
+    for (let yy=ymin; yy<=ymax; yy++) {
+      let seeds = [
+        Buffer.from("pad"),
+        board.toBuffer(),
+        new anchor.BN(xx).toBuffer('le', 2),
+        new anchor.BN(yy).toBuffer('le', 2)
+      ]
+      let [padPubKey, _] = anchor.web3.PublicKey.findProgramAddressSync(seeds, gridApp.programId)
+      out.push(padPubKey)
+    }
+  }
+  console.log("pad ATAs: ", out.length)
+  return out
+}

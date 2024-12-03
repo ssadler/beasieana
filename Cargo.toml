@@ -1,5 +1,5 @@
 [workspace]
-members = [
+members = [ "modules/account_macros", "modules/beastie_common",
     "programs/*"
 ]
 resolver = "2"

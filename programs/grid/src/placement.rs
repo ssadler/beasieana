@@ -1,81 +1,118 @@
-//use anchor_lang::prelude::*;
-//use crate::state::pad::add_cell_to_pad;
-//use crate::types::*;
-//
-//
-//use anchor_lang::solana_program::{
-//    program::invoke_signed,
-//    pubkey::Pubkey,
-//    system_instruction,
-//    sysvar::rent::Rent,
-//    sysvar::Sysvar,
-//};
-//
-//
-//#[derive(Accounts)]
-//pub struct PlaceBeastie<'info> {
-//    pub beastie: Account<'info, beastie::state::
-//    pub payer: Signer<'info>
-//}
-//
-//pub fn place_beastie_on_grid<'info>(ctx: Context<'_, '_, '_, 'info, PlaceBeastie<'info>>, cell_id: u32, pos: CellPos) -> Result<()> {
-//
-//    // Check in bounds // TODO check upper bounds
-//    if pos.x < pos.r || pos.y < pos.r {
-//        panic!("OOB");
-//    }
-//
-//    // TODO check min size, max size, min balance
-//
-//    // TODO: this will overflow, cast to u32
-//    let xmin = (pos.x-pos.r as u16) >> 8;
-//    let xmax = (pos.x+pos.r as u16) >> 8;
-//    let ymin = (pos.y-pos.r as u16) >> 8;
-//    let ymax = (pos.y+pos.r as u16) >> 8;
-//
-//    let mut pda_idx = 0;
-//    
-//    for xx in xmin..(xmax+1) {
-//        let xs = xx.to_string();
-//        let xb = xs.as_bytes();
-//        for yy in ymin..(ymax+1) {
-//            let ys = yy.to_string();
-//            let yb = ys.as_bytes();
-//
-//            let account = ctx.remaining_accounts.get(pda_idx).expect("missing pad");
-//            pda_idx += 1;
-//
-//            let (pda, bump_seed) = Pubkey::find_program_address(&[b"pad", &xb, &yb], ctx.program_id);
-//            if account.key != &pda {
-//                panic!("wrong pad");
-//            }
-//
-//            if !account.is_writable {
-//                panic!("pad account not mutable");
-//            }
-//
-//            if account.data_is_empty() {
-//                let size = 10240;
-//                let reb = Rent::get()?.minimum_balance(size);
-//                let payer = ctx.accounts.payer.to_account_info();
-//
-//                invoke_signed(
-//                    &system_instruction::create_account(
-//                        payer.key,
-//                        account.key,
-//                        reb,
-//                        size as u64,
-//                        ctx.program_id
-//                    ),
-//                    &[payer, account.clone()],
-//                    &[ &[b"pad", &xb, &yb, &[bump_seed]] ]
-//                )?;
-//            }
-//
-//            add_cell_to_pad(account.data.borrow_mut(), cell_id, &pos);
-//        }
-//    }
-//
-//    Ok(())
-//}
-//
+use std::{str::FromStr, u64};
+use anchor_lang::{
+    prelude::*,
+    solana_program::{
+        pubkey::Pubkey,
+        sysvar::rent::Rent,
+        sysvar::Sysvar,
+    }
+};
+use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, Token}};
+use beastie_common::Beastie;
+use crate::{place_on_grid::place_beastie_on_grid, state::beastie::{ActivePlacement, GridBeastie, Placement}};
+use crate::state::board::Board;
+use crate::types::*;
+use crate::utils::*;
+
+
+#[derive(Accounts)]
+pub struct PlacementContext<'info> {
+    #[account(
+        seeds = [b"grid.beastie", byte_ref!(asset_beastie.seed, 8)],
+        bump,
+        constraint = grid_beastie.placement_board.is_none()
+    )]
+    pub grid_beastie: Account<'info, GridBeastie>,
+
+    // This is required to authenticate that it's coming from the Beastie contract (it's a signer)
+    #[account(
+        signer,
+        seeds = [b"asset.beastie", byte_ref!(asset_beastie.seed, 8)],
+        seeds::program = BEASTIE_PROGRAM_ID,
+        bump
+    )]
+    pub asset_beastie: Account<'info, Beastie>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = token_mint,
+        associated_token::authority = asset_beastie
+    )]
+    pub beastie_ata: Account<'info, token::TokenAccount>,
+    #[account(mut,
+        associated_token::mint = token_mint,
+        associated_token::authority = board
+    )]
+    pub board_ata: Account<'info, token::TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    #[account(constraint = token_mint.key() == board.token)]
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        seeds = [b"board", board.seed.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub board: Account<'info, Board>,
+
+    #[account(
+        init_if_needed,
+        space = 1024,
+        payer = payer,
+        seeds = [b"placement", asset_beastie.key().as_ref(), board.key().as_ref()],
+        bump,
+    )]
+    pub placement: Account<'info, Placement>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+
+pub fn place_beastie_on_board<'info>(ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> {
+    // check min size, max size
+    if pos.r < ctx.accounts.board.config.min_radius {
+        panic!("min_radius");
+    }
+    if pos.r > ctx.accounts.board.config.max_radius {
+        panic!("max_radius");
+    }
+    // check min value
+    if ctx.accounts.beastie_ata.amount < ctx.accounts.board.config.add_cell_min_value {
+        panic!("add_cell_min_value");
+    }
+    // Check placement is None
+    if ctx.accounts.placement.active.is_some() {
+        panic!("placement is active");
+    }
+
+    // Approve beastie for billing by board
+    let approval = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        token::Approve {
+            to: ctx.accounts.beastie_ata.to_account_info(),
+            delegate: ctx.accounts.board_ata.to_account_info(),
+            authority: ctx.accounts.asset_beastie.to_account_info()
+        }
+    );
+    token::approve(approval, u64::MAX)?;
+
+    ctx.accounts.grid_beastie.placement_board = Some(ctx.accounts.board.key());
+    ctx.accounts.placement.active = Some(ActivePlacement {
+        billed_height: Clock::get()?.slot,
+        rate: ctx.accounts.board.get_billing_rate(&pos),
+        pos: pos.clone()
+    });
+
+    place_beastie_on_grid(
+        ctx.program_id,
+        ctx.remaining_accounts,
+        ctx.accounts.payer.to_account_info(),
+        ctx.accounts.grid_beastie.cell_id,
+        ctx.accounts.board.key(),
+        pos
+    )
+}
+
