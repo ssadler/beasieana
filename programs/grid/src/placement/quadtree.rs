@@ -31,11 +31,12 @@ pub fn place_beastie_on_grid<'a, 'info>(
     }
     pos.check_bounded();
 
-    for (pda_idx, (xx, yy)) in pos.pads(9).iter().enumerate() {
+
+    for (pda_idx, (xx, yy)) in pos.pads(9).into_iter().enumerate() {
 
         let pad = remaining_accounts.get(pda_idx).expect("missing pad");
 
-        let seeds = [b"pad".as_ref(), space_key.as_ref(), byte_ref!(xx, 2), byte_ref!(yy, 2)];
+        let seeds = [b"pad", space_key.as_ref(), byte_ref!(xx, 2), byte_ref!(yy, 2)];
         let (pda, bump_seed) = Pubkey::find_program_address(&seeds, program_id);
 
         if pad.key != &pda { panic!("wrong pad"); }
@@ -76,7 +77,7 @@ pub fn remove_beastie_from_grid<'a, 'info>(
     pos: CellPos
 ) -> Result<()> {
 
-    for (pda_idx, (xx, yy)) in pos.pads(9).iter().enumerate() {
+    for (pda_idx, (xx, yy)) in pos.pads(9).into_iter().enumerate() {
 
         let pad = remaining_accounts.get(pda_idx).expect("missing pad");
 

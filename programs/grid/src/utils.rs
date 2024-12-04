@@ -2,7 +2,7 @@
 pub mod macros {
     macro_rules! byte_ref {
         ($val:expr, $size:expr) => {
-            unsafe { &*(std::ptr::addr_of!($val) as *const [u8; $size]) }
+            (unsafe { &*(std::ptr::addr_of!($val) as *const [u8; $size]) }).as_ref()
         };
     }
 

@@ -4,7 +4,6 @@ declare_id!("EExeRoQMrfcJP28XQVjcE6khh3U8GC2RVZs28RNut5Br");
 
 mod state;
 mod placement;
-mod place_on_grid;
 mod global;
 mod types;
 mod board;
@@ -82,8 +81,8 @@ pub mod grid {
     }
 
     pub fn remove<'info>(ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>) -> Result<()> {
-        //remove_beastie_from_board(ctx)
-        panic!("TODO");
+        // TODO: Bill first
+        remove_beastie_from_board(ctx)
     }
 
     pub fn bill<'info>(ctx: Context<'_, '_, '_, 'info, BillingContext<'info>>) -> Result<()> {

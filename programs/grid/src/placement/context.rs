@@ -1,4 +1,3 @@
-use std::{str::FromStr, u64};
 use anchor_lang::{
     prelude::*,
     solana_program::{
@@ -9,9 +8,10 @@ use anchor_lang::{
 };
 use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, Token}};
 use beastie_common::Beastie;
-use crate::{place_on_grid::place_beastie_on_grid, state::beastie::{ActivePlacement, GridBeastie, Placement}};
+use signertest::program::Signertest;
+use signertest2::program::Signertest2;
+use crate::state::beastie::{GridBeastie, Placement};
 use crate::state::board::Board;
-use crate::types::*;
 use crate::utils::*;
 
 
@@ -68,51 +68,9 @@ pub struct PlacementContext<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
+
+    //pub signertest_program: Program<'info, Signertest>,
+    //pub signertest2_program: Program<'info, Signertest2>,
 }
 
-
-pub fn place_beastie_on_board<'info>(ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> {
-    // check min size, max size
-    if pos.r < ctx.accounts.board.config.min_radius {
-        panic!("min_radius");
-    }
-    if pos.r > ctx.accounts.board.config.max_radius {
-        panic!("max_radius");
-    }
-    // check min value
-    if ctx.accounts.beastie_ata.amount < ctx.accounts.board.config.add_cell_min_value {
-        panic!("add_cell_min_value");
-    }
-    // Check placement is None
-    if ctx.accounts.placement.active.is_some() {
-        panic!("placement is active");
-    }
-
-    // Approve beastie for billing by board
-    let approval = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
-        token::Approve {
-            to: ctx.accounts.beastie_ata.to_account_info(),
-            delegate: ctx.accounts.board_ata.to_account_info(),
-            authority: ctx.accounts.asset_beastie.to_account_info()
-        }
-    );
-    token::approve(approval, u64::MAX)?;
-
-    ctx.accounts.grid_beastie.placement_board = Some(ctx.accounts.board.key());
-    ctx.accounts.placement.active = Some(ActivePlacement {
-        billed_height: Clock::get()?.slot,
-        rate: ctx.accounts.board.get_billing_rate(&pos),
-        pos: pos.clone()
-    });
-
-    place_beastie_on_grid(
-        ctx.program_id,
-        ctx.remaining_accounts,
-        ctx.accounts.payer.to_account_info(),
-        ctx.accounts.grid_beastie.cell_id,
-        ctx.accounts.board.key(),
-        pos
-    )
-}
 

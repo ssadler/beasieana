@@ -491,9 +491,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.5.1"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30cca6d3674597c30ddf2c587bf8d9d65c9a84d2326d941cc79c9842dfe0ef52"
+checksum = "b8ee0c1824c4dea5b5f81736aff91bae041d2c07ee1192bec91054e10e3e601e"
 dependencies = [
  "arrayref",
  "arrayvec",
@@ -1047,7 +1047,9 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "beastie_common",
- "lazy_static",
+ "signertest",
+ "signertest2",
+ "spl-token",
 ]
 
 [[package]]
@@ -1834,6 +1836,23 @@ name = "signature"
 version = "1.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74233d3b3b2f6d4b006dc19dee745e73e2a6bfb6f93607cd3b02bd5b00797d7c"
+
+[[package]]
+name = "signertest"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "beastie_common",
+ "signertest2",
+]
+
+[[package]]
+name = "signertest2"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "beastie_common",
+]
 
 [[package]]
 name = "siphasher"
