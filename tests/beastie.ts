@@ -11,10 +11,12 @@ describe("beastie", () => {
 
   it("Create Beastie", async () => {
 
-    let r = await createBeastie(10, owner.publicKey)
-
-    assert.equal(r.beastie.seed.toNumber(), 10)
+    let r = await createBeastie(owner.publicKey)
+    assert.equal(r.beastie.cellId, 1)
     assert.equal(r.beastie.owner.toString(), owner.publicKey.toString())
+
+    r = await createBeastie(owner.publicKey)
+    assert.equal(r.beastie.cellId, 2)
   })
 
   const wallet = provider.wallet as anchor.Wallet

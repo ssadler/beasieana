@@ -18,8 +18,8 @@ pub struct BoardConfig {
     pub add_cell_min_value: u64,
     pub min_radius: u16,
     pub max_radius: u16,
-    pub width: u32,
-    pub height: u32
+    pub width: u16,
+    pub height: u16
 }
 
 impl Board {
@@ -32,3 +32,17 @@ impl Board {
         return self.config.rate * pos.area()
     }
 }
+
+impl BoardConfig {
+    pub fn contains_circle(&self, pos: &CellPos) -> bool {
+        // Check lower bounds
+        if pos.x < pos.r || pos.y < pos.r {
+            false
+        } else if self.width - pos.r < pos.x || self.height - pos.r < pos.y {
+            false
+        } else {
+            true
+        }
+    }
+}
+

@@ -1045,10 +1045,10 @@ version = "0.1.0"
 dependencies = [
  "account_macros",
  "anchor-lang",
+ "anchor-lang-idl",
+ "anchor-lang-idl-spec",
  "anchor-spl",
  "beastie_common",
- "signertest",
- "signertest2",
  "spl-token",
 ]
 
@@ -1836,23 +1836,6 @@ name = "signature"
 version = "1.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74233d3b3b2f6d4b006dc19dee745e73e2a6bfb6f93607cd3b02bd5b00797d7c"
-
-[[package]]
-name = "signertest"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "beastie_common",
- "signertest2",
-]
-
-[[package]]
-name = "signertest2"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "beastie_common",
-]
 
 [[package]]
 name = "siphasher"

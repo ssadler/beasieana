@@ -1,3 +1,4 @@
+
 use anchor_lang::{
     prelude::*,
     solana_program::{
@@ -7,70 +8,86 @@ use anchor_lang::{
     }
 };
 use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, Token}};
-use beastie_common::Beastie;
-use signertest::program::Signertest;
-use signertest2::program::Signertest2;
-use crate::state::beastie::{GridBeastie, Placement};
+use beastie_common::{byte_ref, Beastie, BEASTIE_KEY, BEASTIE_PLACEMENT, BEASTIE_PROGRAM_ID};
+use crate::state::beastie::*;
 use crate::state::board::Board;
-use crate::utils::*;
+use crate::billing::BillingContext;
+
 
 
 #[derive(Accounts)]
 pub struct PlacementContext<'info> {
-    #[account(
-        seeds = [b"grid.beastie", byte_ref!(asset_beastie.seed, 8)],
-        bump,
-        constraint = grid_beastie.placement_board.is_none()
-    )]
-    pub grid_beastie: Account<'info, GridBeastie>,
-
     // This is required to authenticate that it's coming from the Beastie contract (it's a signer)
     #[account(
         signer,
-        seeds = [b"asset.beastie", byte_ref!(asset_beastie.seed, 8)],
+        seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         seeds::program = BEASTIE_PROGRAM_ID,
-        bump
+        bump,
+        mut
     )]
-    pub asset_beastie: Account<'info, Beastie>,
+    pub beastie: Box<Account<'info, Beastie>>,
+
+    #[account(
+        seeds = [BEASTIE_PLACEMENT, byte_ref!(placement.cell_id, 4)],
+        bump,
+        mut
+    )]
+    pub placement: Box<Account<'info, GridBeastie>>,
 
     #[account(
         init_if_needed,
         payer = payer,
         associated_token::mint = token_mint,
-        associated_token::authority = asset_beastie
+        associated_token::authority = beastie,
+        constraint = beastie_ata.key() != board_ata.key()
     )]
-    pub beastie_ata: Account<'info, token::TokenAccount>,
+    pub beastie_ata: Box<Account<'info, token::TokenAccount>>,
     #[account(mut,
         associated_token::mint = token_mint,
         associated_token::authority = board
     )]
-    pub board_ata: Account<'info, token::TokenAccount>,
+    pub board_ata: Box<Account<'info, token::TokenAccount>>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     #[account(constraint = token_mint.key() == board.token)]
-    pub token_mint: Account<'info, Mint>,
+    pub token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         seeds = [b"board", board.seed.to_le_bytes().as_ref()],
         bump,
     )]
-    pub board: Account<'info, Board>,
-
-    #[account(
-        init_if_needed,
-        space = 1024,
-        payer = payer,
-        seeds = [b"placement", asset_beastie.key().as_ref(), board.key().as_ref()],
-        bump,
-    )]
-    pub placement: Account<'info, Placement>,
+    pub board: Box<Account<'info, Board>>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
-
-    //pub signertest_program: Program<'info, Signertest>,
-    //pub signertest2_program: Program<'info, Signertest2>,
 }
 
 
+impl<'info> PlacementContext<'info> {
+    pub fn assert_active_placement(&self) {
+        assert!(self.placement.active.is_some(), "beastie not active");
+    }
+}
+
+
+impl<'a, 'b, 'c, 'info> BillingContext<'info> for Context<'a, 'b, 'c, 'info, PlacementContext<'info>> {
+    fn get_placement(&mut self) -> &mut Account<'info, GridBeastie> {
+        &mut self.accounts.placement
+    }
+    fn beastie_ata(&self) -> &Account<'info, token::TokenAccount> {
+        &self.accounts.beastie_ata
+    }
+    fn get_beastie(&self) -> &Account<'info, Beastie> {
+        &self.accounts.beastie
+    }
+    fn billing_board(&self) -> &Account<'info, Board> {
+        &self.accounts.board
+    }
+    fn board_ata(&self) -> &Account<'info, token::TokenAccount> {
+        &self.accounts.board_ata
+    }
+    fn billing_token_program(&self) -> AccountInfo<'info> {
+        self.accounts.token_program.to_account_info()
+    }
+}

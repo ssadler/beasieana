@@ -2,15 +2,15 @@ use anchor_lang::prelude::*;
 
 declare_id!("EExeRoQMrfcJP28XQVjcE6khh3U8GC2RVZs28RNut5Br");
 
+mod remaining_accounts;
+mod batteries;
 mod state;
 mod placement;
 mod global;
 mod types;
 mod board;
 mod beastie_create;
-mod utils;
 mod admin;
-mod accounts_base;
 mod billing;
 
 pub use global::*;
@@ -25,7 +25,7 @@ pub use billing::*;
 #[program]
 pub mod grid {
     use types::CellPos;
-    use utils::{byte_ref, BOARD_KEY};
+    use beastie_common::{byte_ref, BOARD_KEY};
 
     use super::*;
 
@@ -52,14 +52,8 @@ pub mod grid {
         Ok(())
     }
 
-    pub fn init_beastie(
-        ctx: Context<InitBeastie>,
-        seed: u64
-    ) -> Result<()> {
-
-        let beastie = &mut ctx.accounts.grid_beastie;
-        beastie.seed = seed;
-        beastie.cell_id = ctx.accounts.global.next_cell_id();
+    pub fn init_beastie(ctx: Context<InitBeastie>, cell_id: u32) -> Result<()> {
+        ctx.accounts.placement.cell_id = cell_id;
         Ok(())
     }
 
@@ -76,18 +70,23 @@ pub mod grid {
         Ok(())
     }
 
-    pub fn place<'info>(ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> {
-        place_beastie_on_board(ctx, pos)
+    pub fn place<'c, 'info>(ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> where 'c: 'info {
+        placement::place(ctx, pos)
     }
 
-    pub fn remove<'info>(ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>) -> Result<()> {
-        // TODO: Bill first
-        remove_beastie_from_board(ctx)
+    pub fn remove<'c, 'info>(mut ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
+        placement::remove(ctx)
     }
 
-    pub fn bill<'info>(ctx: Context<'_, '_, '_, 'info, BillingContext<'info>>) -> Result<()> {
-        bill_beastie(ctx)?;
-        Ok(())
+    pub fn bill<'info>(mut ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>) -> Result<bool> {
+        Ok(false)
+        //let r = bill_beastie(&mut ctx)?;
+        //if r == BillingResult::Broke {
+        //    remove_beastie_from_board(ctx)?;
+        //    Ok(false)
+        //} else {
+        //    Ok(true)
+        //}
     }
 }
 
@@ -96,3 +95,7 @@ pub struct SayHello<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 }
+
+
+
+

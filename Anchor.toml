@@ -7,8 +7,6 @@ skip-lint = false
 [programs.localnet]
 beastie = "8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU"
 grid = "EExeRoQMrfcJP28XQVjcE6khh3U8GC2RVZs28RNut5Br"
-signertest = "244yWpGi8ba5Yni1wvdgYhWzRvkFpCtfvShN7JF9zn53"
-signertest2 = "D5VHC8DLUnuXCdpyrft9C1fiyshYmiJizzDsuGUwyfqK"
 
 [registry]
 url = "https://api.apr.dev"

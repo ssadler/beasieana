@@ -6,61 +6,65 @@ use anchor_lang:: {
         instruction::Instruction,
     }
 };
-use crate::utils::*;
-use beastie_common::Beastie;
+use beastie_common::*;
 
 #[derive(Accounts)]
 pub struct ProxyCall<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
     #[account(
-        seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8)],
+        seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         bump,
         constraint = &beastie.owner == owner.key
     )]
     pub beastie: Account<'info, Beastie>,
-
-    #[account(mut)]
-    pub owner: Signer<'info>,
-
-    #[account(mut)]
-    pub payer: Signer<'info>,
-}
-
-
-#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq)]
-pub struct AccMeta {
-    pubkey: Pubkey,
-    is_signer: bool,
-    is_writable: bool
-}
-
-impl Into<AccountMeta> for AccMeta {
-    fn into(self) -> AccountMeta {
-        AccountMeta {
-            pubkey: self.pubkey,
-            is_signer: self.is_signer,
-            is_writable: self.is_writable
-        }
-    }
 }
 
 
 
+pub fn proxy<'info>(ctx: Context<'_, '_, '_, 'info, ProxyCall<'info>>, data: Vec<u8>, prepends: u16) -> Result<()> {
 
-pub fn proxy(ctx: Context<ProxyCall>, data: Vec<u8>, accounts: Vec<AccMeta>) -> Result<()> {
-
-    let seeds = [BEASTIE_KEY, byte_ref!(ctx.accounts.beastie.seed, 8), &[ctx.accounts.beastie.bump]];
+    let seeds = [BEASTIE_KEY, byte_ref!(ctx.accounts.beastie.cell_id, 4), &[ctx.bumps.beastie]];
     let signer_seeds = &[&seeds[..]];
+    let mut v = vec![];
 
-    msg!("INVOKIIING");
+    let remaining_accounts = if prepends == 0 {
+        ctx.remaining_accounts
+    } else {
+        let l = (prepends & 0b111) as usize;
+        for i in 0..l {
+            v[i] = if prepends & (8<<i) == 0 {
+                ctx.accounts.beastie.to_account_info()
+            } else {
+                ctx.accounts.owner.to_account_info()
+            }
+        }
+        v.extend_from_slice(ctx.remaining_accounts);
+        &v
+    };
+
     invoke_signed(
         &Instruction::new_with_bytes(
             ctx.remaining_accounts[0].key.clone(),
             data.as_slice(),
-            // Can get this from remaining accounts too?
-            accounts.into_iter().map(Into::into).collect()
+            get_account_metas(&ctx)
         ),
-        &ctx.remaining_accounts,
+        remaining_accounts,
         signer_seeds
-    )?;
-    Ok(())
+    ).map_err(Into::into)
+}
+
+fn get_account_metas<'info>(ctx: &Context<'_, '_, '_, 'info, ProxyCall<'info>>) -> Vec<AccountMeta> {
+    let b: &AccountInfo = ctx.accounts.beastie.as_ref();
+    ctx.remaining_accounts[1..]
+        .iter()
+        .map(|a| {
+            AccountMeta {
+                pubkey: *a.key,
+                is_signer: a.key == b.key || a.is_signer,
+                is_writable: a.is_writable
+            }
+        })
+        .collect::<Vec<_>>()
 }

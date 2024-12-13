@@ -3,6 +3,19 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, PartialEq, Eq)]
 #[repr(C, align(2))] // Ensure proper alignment for CellPos
+pub struct CellPositionedId {
+    pub cell_id: u32,
+    pub pos: CellPos
+}
+
+impl Into<(u32, CellPos)> for &CellPositionedId {
+    fn into(self) -> (u32, CellPos) {
+        (self.cell_id, self.pos)
+    }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, PartialEq, Eq, Debug)]
+#[repr(C, align(2))] // Ensure proper alignment for CellPos
 pub struct CellPos {
     pub x: u16,
     pub y: u16,
@@ -10,15 +23,26 @@ pub struct CellPos {
 }
 
 impl CellPos {
+    pub fn to_tuple(&self) -> (u16, u16, u16) {
+        (self.x, self.y, self.r)
+    }
     pub fn area(&self) -> u64 {
         (314159265 * (self.r as u64).pow(2)) / 100000000
     }
-    pub fn overlaps(&self, o: &CellPos) -> bool {
+    pub fn overlap(&self, o: &CellPos) -> u16 {
         let dx = self.x as i32 - o.x as i32;
         let dy = self.y as i32 - o.y as i32;
         let distance_squared = dx * dx + dy * dy;
-        let radius_sum = self.r as i32 + o.r as i32;
-        distance_squared <= radius_sum * radius_sum
+        let radius_sq = (self.r as i32 + o.r as i32).pow(2);
+        if distance_squared < radius_sq {
+            (radius_sq - distance_squared) as u16
+        } else {
+            0
+        }
+    }
+    #[inline]
+    pub fn overlaps(&self, o: &CellPos) -> bool {
+        self.overlap(o) > 0
     }
 
     pub fn check_bounded(&self) {
@@ -33,7 +57,7 @@ impl CellPos {
     }
 
     // https://stackoverflow.com/a/402010
-    pub fn overlaps_pad(&self, x: u16, y: u16, w: u16, h: u16) -> bool {
+    pub fn overlaps_rect(&self, x: u16, y: u16, w: u16, h: u16) -> bool {
 
         // since we're working with integer division, we'll multiply the sizes of everything by 2
 
@@ -58,24 +82,37 @@ impl CellPos {
         }
     }
 
-    pub fn pads(&self, g: u16) -> Vec<(u16, u16)> {
+    #[inline]
+    pub fn overlaps_pad(&self, (xx, yy): (u16, u16), g: u8) -> bool {
         let gg = 2 << g;
+        self.overlaps_rect(xx*gg, yy*gg, gg, gg)
+    }
+
+    pub fn pads(&self, g: u8) -> impl Iterator<Item = (u16, u16)> + '_ {
         let xmin = (self.x - self.r) >> g;
         let xmax = (self.x + self.r) >> g;
         let ymin = (self.y - self.r) >> g;
         let ymax = (self.y + self.r) >> g;
 
-        let mut out = Vec::new();
+        (xmin..xmax+1)
+            .flat_map(move |e| std::iter::repeat(e).zip(ymin..ymax+1))
+            .filter(move |(xx,yy)| self.overlaps_pad((*xx, *yy), g))
+    }
 
-        for xx in xmin..(xmax+1) {
-            for yy in ymin..(ymax+1) {
-                if self.overlaps_pad(xx*gg, yy*gg, gg, gg) {
-                    out.push((xx, yy));
-                }
-            }
+    pub fn distance_squared(&self, other: &CellPos) -> u32 {
+        let dx = self.x as i32 - other.x as i32;
+        let dy = self.y as i32 - other.y as i32;
+        (dx * dx + dy * dy) as u32
+    }
+
+    pub fn contains(&self, other: &CellPos) -> bool {
+        if other.r > self.r {
+            false
+        } else {
+            let dsq = self.distance_squared(other);
+            let diff = (self.r - other.r) as u32;
+            dsq <= diff * diff
         }
-
-        out
     }
 }
 
@@ -85,14 +122,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_overlaps_pad() {
+    fn test_overlaps_rect() {
 
-        assert!(CellPos { x: 2, y: 2, r: 1 }.overlaps_pad(0, 0, 2, 3));
-        assert!(!CellPos { x: 3, y: 3, r: 1 }.overlaps_pad(0, 0, 2, 3));
-        assert!(!CellPos { x: 3, y: 3, r: 1 }.overlaps_pad(0, 0, 3, 2));
+        assert!(CellPos { x: 2, y: 2, r: 1 }.overlaps_rect(0, 0, 2, 3));
+        assert!(!CellPos { x: 3, y: 3, r: 1 }.overlaps_rect(0, 0, 2, 3));
+        assert!(!CellPos { x: 3, y: 3, r: 1 }.overlaps_rect(0, 0, 3, 2));
 
-        assert!(!CellPos { x: 10, y: 10, r: 2 }.overlaps_pad(0, 0, 12, 8));
-        assert!(CellPos { x: 10, y: 10, r: 2 }.overlaps_pad(0, 0, 12, 9));
+        assert!(!CellPos { x: 10, y: 10, r: 2 }.overlaps_rect(0, 0, 12, 8));
+        assert!(CellPos { x: 10, y: 10, r: 2 }.overlaps_rect(0, 0, 12, 9));
+    }
+
+
+    #[test]
+    fn test_overlaps() {
+        let old = &CellPos { x: 50, y: 100, r: 50 };
+        let new = &CellPos { x: 200, y: 100, r: 100 };
+
+        assert!(old.overlap(new) == 0);
+        assert!(old.overlaps(new) == false);
     }
 }
 

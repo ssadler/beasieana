@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
-use beastie_common::Beastie;
-use crate::utils::*;
+use beastie_common::*;
 
 
 #[derive(Accounts)]
 pub struct Transfer<'info> {
     #[account(
-        seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8)],
+        seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         bump,
         constraint = &beastie.owner == owner.key
     )]

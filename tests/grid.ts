@@ -1,8 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import * as Token from "@solana/spl-token";
 import { buildProxy, createBeastie, gridApp } from './common'
-import {assert, expect} from "chai";
-
+import {assert} from "chai";
 
 describe("grid", () => {
   // Configure the client to use the local cluster.
@@ -19,12 +18,8 @@ describe("grid", () => {
 
 
   it("Init Beastie", async () => {
-    let seed = Math.floor(Math.random()*1000000000)
-
-    let { gridBeastie } = await createBeastie(seed)
-
-    assert.equal(gridBeastie.seed.toNumber(), seed)
-    assert.equal(gridBeastie.cellId, 1)
+    let { placement } = await createBeastie()
+    assert.equal(placement.cellId, 1)
   })
 
 
@@ -62,56 +57,124 @@ describe("grid", () => {
     await call.rpc()
   })
 
+  type Beastie = Awaited<ReturnType<typeof createBeastie>>
+  type Placement = Awaited<ReturnType<typeof placeBeastie>>
+  let placed: Beastie
 
-  it("Place beastie", async () => {
-    let beastie = await createBeastie(3)
+  async function placeBeastie(beastie: Beastie, pos: Pos, opts: { interacts?: Placement[] }={}) {
 
     let beastieATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, owner.payer, mint, beastie.address, true)
     await Token.mintTo(provider.connection, owner.payer, mint, beastieATA.address, mintAuthority, 1000000)
 
-    let pos = { x: 200, y: 200, r: 200 }
-    let pads = getPadATAs(board, pos).map((pubkey) => ({ isSigner: false, isWritable: true, pubkey }))
+
+    let pads = getPadATAs(pos, ...(opts.interacts||[]).map((b) => b.pos))
+    let remaining = [
+        ...pads,
+        ...(opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: b.beastie.address })),
+        ...(opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: b.beastieATA.address })),
+        ...(opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: b.beastie.placement.address })),
+      ]
+
     let placeCall = gridApp.methods
       .place(pos)
       .accountsPartial({
-        assetBeastie: beastie.address,
-        gridBeastie: beastie.gridBeastie.address,
+        beastie: beastie.address,
+        placement: beastie.placement.address,
+        board,
+        tokenMint: mint
+      })
+      .remainingAccounts(remaining)
+
+    let r = await buildProxy(beastie.address, await placeCall.instruction()).rpc()
+
+    //await new Promise((r) => setTimeout(r, 100))
+    //let tx = await provider.connection.getTransaction(r, { commitment: 'confirmed' })
+    //console.log(`placeBeastie: ${tx.meta.computeUnitsConsumed} CU`)
+
+    return {
+      beastieATA,
+      beastie,
+      pos,
+      pads
+    }
+  }
+
+  it("Place beastie", async () => {
+    let beastie = placed = await createBeastie()
+    let { pads } = await placeBeastie(beastie, { x: 200, y: 200, r: 200 })
+
+    let p = await provider.connection.getAccountInfo(pads[0].pubkey)
+    assert.deepEqual([...p.data.subarray(0, 14)], [1,0,0,0,2,0,0,0,200,0,200,0,200,0])
+  })
+
+  it("Remove beastie", async () => {
+    let pos = { x: 200, y: 200, r: 200 }
+    let pads = getPadATAs(pos)
+    let removeCall = gridApp.methods
+      .remove()
+      .accountsPartial({
+        beastie: placed.address,
+        placement: placed.placement.address,
         board,
         tokenMint: mint
       })
       .remainingAccounts(pads)
 
-    await buildProxy(beastie.address, await placeCall.instruction()).rpc()
+    let call = buildProxy(placed.address, await removeCall.instruction())
+    try {
+      await call.rpc()
+    } catch (e) {
+      let txid = String(e).split(' ')[3]
+      let tx = await provider.connection.getTransaction(txid, {
+        commitment: "confirmed",
+      })
+      throw e
+    }
+    for (let pad of pads) {
+      let p = await provider.connection.getAccountInfo(pad.pubkey)
+      assert.deepEqual([...p.data.subarray(0, 14)], [0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+    }
+  })
 
-    let p = await provider.connection.getAccountInfo(pads[0].pubkey)
-    assert.deepEqual([...p.data.subarray(0, 14)], [1,0,0,0,2,0,0,0,200,0,200,0,200,0])
+  it("Shrink beastie", async () => {
+    let beastie = await createBeastie()
+    let pos = { x: 100, y: 100, r: 100 }
+    let b = await placeBeastie(beastie, pos)
+
+    let beastie2 = await createBeastie()
+    let pos2 = { x: 380, y: 100, r: 100 }
+    await placeBeastie(beastie2, pos2, { interacts: [b] })
   })
 })
 
 
+type Pos = { x: number, y: number, r: number }
 
-function getPadATAs(board: anchor.web3.PublicKey, pos: { x: number, y: number, r: number }) {
-  let xmin = (pos.x - pos.r) >> 9;
-  let xmax = (pos.x + pos.r) >> 9;
-  let ymin = (pos.y - pos.r) >> 9;
-  let ymax = (pos.y + pos.r) >> 9;
 
-  let out = []
-  
-  for (let xx=xmin; xx<=xmax; xx++) {
-    for (let yy=ymin; yy<=ymax; yy++) {
-      //if (!circleOverlapsPad(pos.x, pos.y, pos.r, xx, yy, 512, 512)) continue;
-      let seeds = [
-        Buffer.from("pad"),
-        board.toBuffer(),
-        new anchor.BN(xx).toBuffer('le', 2),
-        new anchor.BN(yy).toBuffer('le', 2)
-      ]
-      let [padPubKey, _] = anchor.web3.PublicKey.findProgramAddressSync(seeds, gridApp.programId)
-      out.push(padPubKey)
+function getPadATAs(...positions: Pos[]) {
+  const out: { [k: string]: anchor.web3.AccountMeta } = {}
+
+  for (let pos of positions) {
+    let xmin = (pos.x - pos.r) >> 9;
+    let xmax = (pos.x + pos.r) >> 9;
+    let ymin = (pos.y - pos.r) >> 9;
+    let ymax = (pos.y + pos.r) >> 9;
+
+    for (let xx=xmin; xx<=xmax; xx++) {
+      for (let yy=ymin; yy<=ymax; yy++) {
+        //if (!circleOverlapsPad(pos.x, pos.y, pos.r, xx, yy, 512, 512)) continue;
+        let seeds = [
+          Buffer.from("pad"),
+          Buffer.from(""),
+          new anchor.BN(xx).toBuffer('le', 2),
+          new anchor.BN(yy).toBuffer('le', 2)
+        ]
+        let [pubkey, _] = anchor.web3.PublicKey.findProgramAddressSync(seeds, gridApp.programId)
+        out[pubkey.toString()] = { isSigner: false, isWritable: true, pubkey }
+      }
     }
   }
-  return out
+  return Object.values(out)
 }
 
 

@@ -1,37 +1,33 @@
 use anchor_lang::prelude::*;
-use beastie_common::Beastie;
+use beastie_common::*;
 
 mod proxy;
-mod utils;
 mod transfer;
 
-use utils::*;
 use proxy::*;
 use transfer::*;
 
 declare_id!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");
 
 
-#[derive(Accounts)]
-struct SayTest {
-}
 
 #[program]
 pub mod beastie {
     use super::*;
 
-    pub fn say_test(ctx: Context<SayTest>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.global._next_cell_id += 1;
         Ok(())
     }
 
-    pub fn create_beastie(ctx: Context<CreateBeastie>, seed: u64, owner: Pubkey) -> Result<()> {
+    pub fn create_beastie(ctx: Context<CreateBeastie>, owner: Pubkey) -> Result<()> {
 
         let beastie = &mut ctx.accounts.beastie;
-        beastie.seed = seed;
+        beastie.cell_id = ctx.accounts.global.next_cell_id();
         beastie.creation_slot = Clock::get()?.slot;
         beastie.owner = owner;
 
-        let seeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8)];
+        let seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)];
         let (pda, bump) = Pubkey::find_program_address(&seeds, ctx.program_id);
         if pda != beastie.key() {
             panic!("pda wrong");
@@ -41,25 +37,28 @@ pub mod beastie {
 
         // create beastie in grid
 
-        let sseeds = [BEASTIE_KEY, byte_ref!(beastie.seed, 8), &[beastie.bump]];
+        let sseeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4), &[ctx.bumps.beastie]];
         let signer_seeds = &[&sseeds[..]];
         let cpi = CpiContext::new_with_signer(
             ctx.accounts.grid_program.to_account_info(),
             grid::cpi::accounts::InitBeastie {
-                asset_beastie: beastie.to_account_info(),
+                beastie: beastie.to_account_info(),
                 payer: ctx.accounts.payer.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
-                global: ctx.accounts.global.to_account_info(),
-                grid_beastie: ctx.accounts.grid_beastie.to_account_info(),
+                placement: ctx.accounts.placement.to_account_info(),
             },
             signer_seeds
         );
 
-        grid::cpi::init_beastie(cpi, seed)
+        grid::cpi::init_beastie(cpi, beastie.cell_id)
     }
 
-    pub fn proxy(ctx: Context<ProxyCall>, data: Vec<u8>, accounts: Vec<AccMeta>) -> Result<()> {
-        crate::proxy::proxy(ctx, data, accounts)
+    pub fn proxy<'info>(
+        ctx: Context<'_, '_, '_, 'info, ProxyCall<'info>>,
+        data: Vec<u8>,
+        prepends: u16
+    ) -> Result<()> {
+        crate::proxy::proxy(ctx, data, prepends)
     }
 
     pub fn transfer_ownership(ctx: Context<Transfer>, new_owner: Pubkey) -> Result<()> {
@@ -69,31 +68,52 @@ pub mod beastie {
 
 use grid::program::Grid;
 
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(init, space=1024, payer=payer, seeds = [b"global"], bump)]
+    pub global: Account<'info, Global>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 
 #[derive(Accounts)]
-#[instruction(seed: u64, owner: Pubkey)]
+#[instruction(owner: Pubkey)]
 pub struct CreateBeastie<'info> {
     #[account(
         init,
         payer = payer,
         space = 4096,
-        seeds = [BEASTIE_KEY, seed.to_le_bytes().as_ref()],
+        seeds = [BEASTIE_KEY, global._next_cell_id.to_le_bytes().as_ref()],
         bump
     )]
     pub beastie: Account<'info, Beastie>,
 
-    #[account(mut, seeds = [b"grid"], seeds::program = grid_program.key(), bump)]
-    /// CHECK: yep
-    pub global: UncheckedAccount<'info>,
+    #[account(mut, seeds = [b"global"], bump)]
+    pub global: Account<'info, Global>,
 
-    #[account(mut, seeds = [b"grid.beastie", seed.to_le_bytes().as_ref()], seeds::program = grid_program.key(), bump)]
+    #[account(mut, seeds = [BEASTIE_PLACEMENT, global._next_cell_id.to_le_bytes().as_ref()], seeds::program = grid_program.key(), bump)]
     /// CHECK: yep
-    pub grid_beastie: UncheckedAccount<'info>,
+    pub placement: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub grid_program: Program<'info, Grid>,
+}
+
+
+#[account]
+pub struct Global {
+    _next_cell_id: u32,
+}
+
+impl Global {
+    pub fn next_cell_id(&mut self) -> u32 {
+        self._next_cell_id += 1;
+        self._next_cell_id - 1
+    }
 }
 
 

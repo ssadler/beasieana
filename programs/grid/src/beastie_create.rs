@@ -1,35 +1,30 @@
-use std::str::FromStr;
-
 use anchor_lang::prelude::*;
+use beastie_common::{BEASTIE_KEY, BEASTIE_PLACEMENT, BEASTIE_PROGRAM_ID};
 
 use crate::state::beastie::*;
-use crate::state::global::*;
 
 
 
 
 #[derive(Accounts)]
-#[instruction(seed: u64)]
+#[instruction(cell_id: u32)]
 pub struct InitBeastie<'info> {
     #[account(
         init,
         payer = payer,
-        space = 4096,
-        seeds = [b"grid.beastie", seed.to_le_bytes().as_ref()],
+        space = 10240,
+        seeds = [BEASTIE_PLACEMENT, cell_id.to_le_bytes().as_ref()],
         bump,
     )]
-    pub grid_beastie: Account<'info, GridBeastie>,
+    pub placement: Account<'info, GridBeastie>,
 
     // This is required to authenticate that it's coming from the Beastie contract (it's a signer)
     #[account(
-        seeds = [b"asset.beastie", seed.to_le_bytes().as_ref()],
-        seeds::program = Pubkey::from_str("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU").unwrap(),
+        seeds = [BEASTIE_KEY, cell_id.to_le_bytes().as_ref()],
+        seeds::program = BEASTIE_PROGRAM_ID,
         bump
     )]
-    pub asset_beastie: Signer<'info>,
-
-    #[account(init_if_needed, payer = payer, space = 4096, seeds = [b"grid"], bump)]
-    pub global: Account<'info, Global>,
+    pub beastie: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

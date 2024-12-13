@@ -13,16 +13,24 @@ const wallet = provider.wallet as anchor.Wallet
 export const gridApp = anchor.workspace.Grid as anchor.Program<Grid>
 export const beastieApp = anchor.workspace.Beastie as anchor.Program<Beastie>
 
-export async function createBeastie(seed?: number, owner?: anchor.web3.PublicKey) {
-  seed ||= Math.floor(Math.random()*1000000000)
+let init = false
+
+export async function createBeastie(owner?: anchor.web3.PublicKey) {
+
+  if (!init) {
+    await beastieApp.methods.initialize().rpc()
+    init = true
+  }
+
+
   owner ||= wallet.publicKey
-  let call = beastieApp.methods.createBeastie(new anchor.BN(seed), owner)
+  let call = beastieApp.methods.createBeastie(owner)
   await call.rpc()
   let accts = await call.pubkeys()
   return {
-    gridBeastie: {
-      ...await gridApp.account.gridBeastie.fetch(accts.gridBeastie),
-      address: accts.gridBeastie
+    placement: {
+      ...await gridApp.account.gridBeastie.fetch(accts.placement),
+      address: accts.placement
     },
     beastie: await beastieApp.account.beastie.fetch(accts.beastie),
     address: accts.beastie
@@ -32,7 +40,7 @@ export async function createBeastie(seed?: number, owner?: anchor.web3.PublicKey
 
 export function buildProxy(beastie: anchor.web3.PublicKey, call: anchor.web3.TransactionInstruction) {
   return beastieApp.methods
-    .proxy(call.data, call.keys)
+    .proxy(call.data, 0)
     .accountsPartial({ beastie })
     .remainingAccounts([
       {
