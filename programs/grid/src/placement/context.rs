@@ -8,7 +8,7 @@ use anchor_lang::{
     }
 };
 use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, Token}};
-use beastie_common::{byte_ref, Beastie, BEASTIE_KEY, BEASTIE_PLACEMENT, BEASTIE_PROGRAM_ID};
+use beastie_common::{byte_ref, Beastie, BEASTIE_KEY, CELL_KEY, BEASTIE_PROGRAM_ID};
 use crate::state::beastie::*;
 use crate::state::board::Board;
 use crate::billing::BillingContext;
@@ -28,11 +28,11 @@ pub struct PlacementContext<'info> {
     pub beastie: Box<Account<'info, Beastie>>,
 
     #[account(
-        seeds = [BEASTIE_PLACEMENT, byte_ref!(placement.cell_id, 4)],
+        seeds = [CELL_KEY, byte_ref!(cell.cell_id, 4)],
         bump,
         mut
     )]
-    pub placement: Box<Account<'info, Cell>>,
+    pub cell: Box<Account<'info, Cell>>,
 
     #[account(
         init_if_needed,
@@ -64,8 +64,8 @@ pub struct PlacementContext<'info> {
 }
 
 impl<'a, 'b, 'c, 'info> BillingContext<'info> for Context<'a, 'b, 'c, 'info, PlacementContext<'info>> {
-    fn get_placement(&mut self) -> &mut Account<'info, Cell> {
-        &mut self.accounts.placement
+    fn get_cell(&mut self) -> &mut Account<'info, Cell> {
+        &mut self.accounts.cell
     }
     fn beastie_ata(&self) -> &Account<'info, token::TokenAccount> {
         &self.accounts.beastie_ata
@@ -86,7 +86,7 @@ impl<'a, 'b, 'c, 'info> BillingContext<'info> for Context<'a, 'b, 'c, 'info, Pla
 
 impl<'info> HasActiveBeastie for PlacementContext<'info> {
     fn get_cell(&self) -> &ActiveCell {
-        self.placement.as_active()
+        self.cell.as_active()
     }
     fn get_ata(&self) -> &token::TokenAccount {
         &self.beastie_ata

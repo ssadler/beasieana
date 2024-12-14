@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use beastie_common::{BEASTIE_KEY, BEASTIE_PLACEMENT, BEASTIE_PROGRAM_ID};
+use beastie_common::{BEASTIE_KEY, CELL_KEY, BEASTIE_PROGRAM_ID};
 
 use crate::state::beastie::*;
 
@@ -13,7 +13,7 @@ pub struct InitBeastie<'info> {
         init,
         payer = payer,
         space = 10240,
-        seeds = [BEASTIE_PLACEMENT, cell_id.to_le_bytes().as_ref()],
+        seeds = [CELL_KEY, cell_id.to_le_bytes().as_ref()],
         bump,
     )]
     pub placement: Account<'info, Cell>,

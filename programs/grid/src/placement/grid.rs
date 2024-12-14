@@ -67,7 +67,7 @@ fn replace_interact<'c, 'info>(
     mut other: CellPositionedId
 ) -> Result<()> {
 
-    if cell.cell_id != ctx.get_placement().cell_id {
+    if cell.cell_id != ctx.get_cell().cell_id {
         panic!("unexpected interact");
     }
 

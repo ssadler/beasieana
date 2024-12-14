@@ -26,7 +26,7 @@ fn create_link<'c, 'info>(
     let config = &ctx.accounts.board.config;
     let cell = ctx.accounts.cell.as_active();
     let mut other_acct: Account<'info, Cell> = Account::try_from(
-        ctx.rem.get_placement(link.cell_id, None).expect("error getting other cell in create_link")
+        ctx.rem.get_cell(link.cell_id, None).expect("error getting other cell in create_link")
     )?;
     let other = other_acct.as_active();
 
@@ -72,7 +72,7 @@ fn remove_link<'c, 'info>(
 ) -> Result<()> where 'c: 'info {
     
     let mut other_acct: Account<'info, Cell> = Account::try_from(
-        ctx.rem.get_placement(cell_id, None).expect("error getting other cell in create_link")
+        ctx.rem.get_cell(cell_id, None).expect("error getting other cell in create_link")
     )?;
 
     // To remove links we don't do so many checks
@@ -100,7 +100,7 @@ pub struct LinksContext<'info> {
     pub beastie: Box<Account<'info, Beastie>>,
 
     #[account(
-        seeds = [BEASTIE_PLACEMENT, byte_ref!(cell.cell_id, 4)],
+        seeds = [CELL_KEY, byte_ref!(cell.cell_id, 4)],
         bump,
         mut
     )]

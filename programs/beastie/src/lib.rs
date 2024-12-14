@@ -45,7 +45,7 @@ pub mod beastie {
                 beastie: beastie.to_account_info(),
                 payer: ctx.accounts.payer.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
-                placement: ctx.accounts.placement.to_account_info(),
+                placement: ctx.accounts.cell.to_account_info(),
             },
             signer_seeds
         );
@@ -92,9 +92,9 @@ pub struct CreateBeastie<'info> {
     #[account(mut, seeds = [b"global"], bump)]
     pub global: Account<'info, Global>,
 
-    #[account(mut, seeds = [BEASTIE_PLACEMENT, global._next_cell_id.to_le_bytes().as_ref()], seeds::program = grid_program.key(), bump)]
+    #[account(mut, seeds = [CELL_KEY, global._next_cell_id.to_le_bytes().as_ref()], seeds::program = grid_program.key(), bump)]
     /// CHECK: yep
-    pub placement: UncheckedAccount<'info>,
+    pub cell: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

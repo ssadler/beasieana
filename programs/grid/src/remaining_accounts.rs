@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, ops::{Deref, DerefMut}};
 use anchor_lang::{prelude::*, Bumps};
 use anchor_spl::associated_token::get_associated_token_address;
-use beastie_common::{leak, BEASTIE_PLACEMENT, GRID_PROGRAM_ID, PAD_KEY};
+use beastie_common::{leak, CELL_KEY, GRID_PROGRAM_ID, PAD_KEY};
 use spl_token::solana_program::{program::invoke_signed, system_instruction};
 
 
@@ -75,8 +75,8 @@ impl<'info> RemainingAccounts<'info> {
         }
         Ok(pda)
     }
-    pub fn get_placement(&self, cell_id: u32, init: InitPDA<'_, 'info>) -> AccountResult<'info> {
-        let other_beastie_seeds = vec![BEASTIE_PLACEMENT, leak!(cell_id.to_le_bytes())];
+    pub fn get_cell(&self, cell_id: u32, init: InitPDA<'_, 'info>) -> AccountResult<'info> {
+        let other_beastie_seeds = vec![CELL_KEY, leak!(cell_id.to_le_bytes())];
         self.get_pda(other_beastie_seeds, &GRID_PROGRAM_ID, init)
     }
     pub fn get_pad(&self, space_key: &'static [u8], xx: u16, yy: u16, init: InitPDA<'_, 'info>) -> AccountResult<'info> {

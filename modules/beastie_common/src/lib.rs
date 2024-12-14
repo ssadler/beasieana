@@ -37,10 +37,10 @@ macro_rules! u8_to_vec_box {
 use anchor_lang::prelude::Pubkey;
 
 
-pub const BEASTIE_KEY: &[u8] = b"beastie.asset";
-pub const BEASTIE_PLACEMENT: &[u8] = b"beastie.placement";
-pub static BOARD_KEY: &[u8] = b"board";
-pub static PAD_KEY: &[u8] = b"pad";
+pub static BEASTIE_KEY:          &[u8] = b"beastie";
+pub static CELL_KEY:             &[u8] = b"cell";
+pub static BOARD_KEY:            &[u8] = b"board";
+pub static PAD_KEY:              &[u8] = b"pad";
 
 
 pub static BEASTIE_PROGRAM_ID: Pubkey = pubkey!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");

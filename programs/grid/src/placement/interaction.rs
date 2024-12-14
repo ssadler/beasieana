@@ -25,7 +25,7 @@ pub fn interact<'info>(
     }
 
     let other_beastie: Account<'info, ActiveCell> = Account::try_from(
-        ctx.rem.get_placement(other.cell_id, None).expect("error getting placement PDA in interact")
+        ctx.rem.get_cell(other.cell_id, None).expect("error getting placement PDA in interact")
     )?;
     let other_ata: Account<'info, token::TokenAccount> = Account::try_from(
         ctx.rem.get_ata(&other_beastie.asset_address(), &ctx.accounts.board.token).expect("Error getting ATA in interact")

@@ -17,7 +17,7 @@ use crate::{start_billing, BillingContext, CellPos};
 pub fn place<'c, 'info>(ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> where 'c: 'info {
     let mut ctx = CTX::new(ctx);
     start_billing(ctx.deref_mut(), pos)?;
-    let cell = crate::CellPositionedId { cell_id: ctx.get_placement().cell_id, pos };
+    let cell = crate::CellPositionedId { cell_id: ctx.get_cell().cell_id, pos };
     place_beastie_on_grid(&mut ctx, cell)
 }
 
@@ -40,7 +40,7 @@ pub fn bill_or_remove<'c, 'info>(ctx: &mut CTX<'_, '_, 'c, 'info, PlacementConte
 
 
 fn _remove<'c, 'info>(ctx: &mut CTX<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
-    let cell = ctx.get_placement().as_active().get_cell();
+    let cell = ctx.get_cell().as_active().get_cell();
     remove_beastie_from_grid(&mut ctx.rem, cell)
 }
 

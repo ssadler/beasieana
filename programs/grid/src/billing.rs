@@ -16,11 +16,11 @@ pub trait BillingContext<'info> : Sized {
     fn billing_board(&self) -> &Account<'info, Board>;
     fn billing_token_program(&self) -> AccountInfo<'info>;
     fn get_beastie(&self) -> &Account<'info, Beastie>;
-    fn get_placement(&mut self) -> &mut Account<'info, Cell>;
+    fn get_cell(&mut self) -> &mut Account<'info, Cell>;
     fn beastie_ata(&self) -> &Account<'info, token::TokenAccount>;
     fn commit_balance<'a, 'b>(&mut self, amount: u64) -> Result<()> {
         let k = self.billing_board().key();
-        self.get_placement().commitments.modify(k, |v| *v += amount);
+        self.get_cell().commitments.modify(k, |v| *v += amount);
         self.transfer_to_board(amount)
     }
     fn transfer_to_board<'a, 'b>(&'a self, amount: u64) -> Result<()> {
@@ -51,7 +51,7 @@ pub enum BillingResult {
 
 pub fn bill_beastie<'info, C: BillingContext<'info>>(ctx: &mut C) -> Result<BillingResult> {
 
-    let cell = ctx.get_placement().as_active();
+    let cell = ctx.get_cell().as_active();
     let height = Clock::get()?.slot;
     let diff = height - cell.billed_height;
     if diff == 0 {
@@ -63,10 +63,10 @@ pub fn bill_beastie<'info, C: BillingContext<'info>>(ctx: &mut C) -> Result<Bill
 
     // first take from committed
     let board_key = ctx.billing_board().key();
-    let committed = ctx.get_placement().commitments.get(&board_key);
+    let committed = ctx.get_cell().commitments.get(&board_key);
     if committed > 0 {
         let take_c = std::cmp::min(due, committed);
-        ctx.get_placement().commitments.modify(board_key, |v| *v -= take_c);
+        ctx.get_cell().commitments.modify(board_key, |v| *v -= take_c);
         due -= take_c;
     }
 
@@ -78,7 +78,7 @@ pub fn bill_beastie<'info, C: BillingContext<'info>>(ctx: &mut C) -> Result<Bill
         ctx.transfer_to_board(take_t)?;
     }
 
-    let cell = ctx.get_placement().as_active_mut();
+    let cell = ctx.get_cell().as_active_mut();
     cell.billed_height = height;
 
     if due > 0 {
@@ -111,7 +111,7 @@ pub fn start_billing<'c, 'info, C: BillingContext<'info>>(ctx: &mut C, pos: Cell
     }
     
     // Check placement is None
-    if ctx.get_placement().is_active() {
+    if ctx.get_cell().is_active() {
         panic!("placement is active");
     }
 
@@ -133,7 +133,7 @@ pub fn start_billing<'c, 'info, C: BillingContext<'info>>(ctx: &mut C, pos: Cell
         pos: pos.clone(),
         linked_balance: 0
     };
-    ctx.get_placement().activate(p);
+    ctx.get_cell().activate(p);
 
     Ok(())
 }
