@@ -1,8 +1,36 @@
-use std::{cell::RefCell, collections::HashMap};
-use anchor_lang::prelude::*;
+use std::{cell::RefCell, collections::HashMap, ops::{Deref, DerefMut}};
+use anchor_lang::{prelude::*, Bumps};
 use anchor_spl::associated_token::get_associated_token_address;
 use beastie_common::{leak, BEASTIE_PLACEMENT, GRID_PROGRAM_ID, PAD_KEY};
 use spl_token::solana_program::{program::invoke_signed, system_instruction};
+
+
+
+pub struct CTX<'a, 'b, 'c, 'info, A: Bumps> {
+    pub ctx: Context<'a, 'b, 'c, 'info, A>,
+    pub rem: RemainingAccounts<'info>
+}
+
+impl<'a, 'b, 'c, 'info, A: Bumps> Deref for CTX<'a, 'b, 'c, 'info, A> {
+    type Target = Context<'a, 'b, 'c, 'info, A>;
+    fn deref(&self) -> &Self::Target {
+        &self.ctx
+    }
+}
+impl<'a, 'b, 'c, 'info, A: Bumps> DerefMut for CTX<'a, 'b, 'c, 'info, A> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ctx
+    }
+}
+
+impl<'a, 'b, 'c, 'info, A: Bumps> CTX<'a, 'b, 'c, 'info, A> {
+    pub fn new(ctx: Context<'a, 'b, 'c, 'info, A>)
+        -> CTX<'a, 'b, 'c, 'info, A> where 'c: 'info
+    {
+        let r = ctx.remaining_accounts;
+        CTX { ctx, rem: RemainingAccounts::new(r) }
+    }
+}
 
 
 
@@ -17,7 +45,7 @@ impl<'info> RemainingAccounts<'info> {
     pub fn new(rem: &'info [AccountInfo<'info>]) -> RemainingAccounts<'info> {
         RemainingAccounts { rem, cache: (0, HashMap::new()).into() }
     }
-    pub fn get(&self, addr: &Pubkey) -> AccountResult<'info> {
+    fn get(&self, addr: &Pubkey) -> AccountResult<'info> {
         if let Some(r) = self.cache.borrow().1.get(addr) {
             return Ok(*r);
         }

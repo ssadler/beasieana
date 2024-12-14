@@ -3,15 +3,6 @@
 version = 3
 
 [[package]]
-name = "account_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.90",
-]
-
-[[package]]
 name = "aead"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1043,7 +1034,6 @@ dependencies = [
 name = "grid"
 version = "0.1.0"
 dependencies = [
- "account_macros",
  "anchor-lang",
  "anchor-lang-idl",
  "anchor-lang-idl-spec",

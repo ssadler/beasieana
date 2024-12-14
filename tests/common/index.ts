@@ -22,7 +22,6 @@ export async function createBeastie(owner?: anchor.web3.PublicKey) {
     init = true
   }
 
-
   owner ||= wallet.publicKey
   let call = beastieApp.methods.createBeastie(owner)
   await call.rpc()
@@ -40,14 +39,10 @@ export async function createBeastie(owner?: anchor.web3.PublicKey) {
 
 export function buildProxy(beastie: anchor.web3.PublicKey, call: anchor.web3.TransactionInstruction) {
   return beastieApp.methods
-    .proxy(call.data, 0)
+    .proxy(call.data)
     .accountsPartial({ beastie })
     .remainingAccounts([
-      {
-        pubkey: call.programId,
-        isSigner: false,
-        isWritable: false
-      },
+      { pubkey: call.programId, isSigner: false, isWritable: false },
       ...call.keys.map((k) => k.pubkey.equals(beastie) ? {...k, isSigner: false} : k)
     ])
 }

@@ -68,11 +68,12 @@ describe("grid", () => {
 
 
     let pads = getPadATAs(pos, ...(opts.interacts||[]).map((b) => b.pos))
+    let toAccountInfo = (f: (b: Placement) => anchor.web3.PublicKey) => (opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: f(b) }))
     let remaining = [
         ...pads,
-        ...(opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: b.beastie.address })),
-        ...(opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: b.beastieATA.address })),
-        ...(opts.interacts||[]).map((b) => ({ isWritable: false, isSigner: false, pubkey: b.beastie.placement.address })),
+        ...toAccountInfo((b) => b.beastie.address),
+        ...toAccountInfo((b) => b.beastieATA.address),
+        ...toAccountInfo((b) => b.beastie.placement.address),
       ]
 
     let placeCall = gridApp.methods

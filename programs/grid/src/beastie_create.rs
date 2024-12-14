@@ -16,7 +16,7 @@ pub struct InitBeastie<'info> {
         seeds = [BEASTIE_PLACEMENT, cell_id.to_le_bytes().as_ref()],
         bump,
     )]
-    pub placement: Account<'info, GridBeastie>,
+    pub placement: Account<'info, Cell>,
 
     // This is required to authenticate that it's coming from the Beastie contract (it's a signer)
     #[account(

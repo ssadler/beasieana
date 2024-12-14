@@ -56,9 +56,8 @@ pub mod beastie {
     pub fn proxy<'info>(
         ctx: Context<'_, '_, '_, 'info, ProxyCall<'info>>,
         data: Vec<u8>,
-        prepends: u16
     ) -> Result<()> {
-        crate::proxy::proxy(ctx, data, prepends)
+        crate::proxy::proxy(ctx, data)
     }
 
     pub fn transfer_ownership(ctx: Context<Transfer>, new_owner: Pubkey) -> Result<()> {

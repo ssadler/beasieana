@@ -32,7 +32,7 @@ pub struct PlacementContext<'info> {
         bump,
         mut
     )]
-    pub placement: Box<Account<'info, GridBeastie>>,
+    pub placement: Box<Account<'info, Cell>>,
 
     #[account(
         init_if_needed,
@@ -63,16 +63,8 @@ pub struct PlacementContext<'info> {
     pub system_program: Program<'info, System>,
 }
 
-
-impl<'info> PlacementContext<'info> {
-    pub fn assert_active_placement(&self) {
-        assert!(self.placement.active.is_some(), "beastie not active");
-    }
-}
-
-
 impl<'a, 'b, 'c, 'info> BillingContext<'info> for Context<'a, 'b, 'c, 'info, PlacementContext<'info>> {
-    fn get_placement(&mut self) -> &mut Account<'info, GridBeastie> {
+    fn get_placement(&mut self) -> &mut Account<'info, Cell> {
         &mut self.accounts.placement
     }
     fn beastie_ata(&self) -> &Account<'info, token::TokenAccount> {
@@ -89,5 +81,14 @@ impl<'a, 'b, 'c, 'info> BillingContext<'info> for Context<'a, 'b, 'c, 'info, Pla
     }
     fn billing_token_program(&self) -> AccountInfo<'info> {
         self.accounts.token_program.to_account_info()
+    }
+}
+
+impl<'info> HasActiveBeastie for PlacementContext<'info> {
+    fn get_cell(&self) -> &ActiveCell {
+        self.placement.as_active()
+    }
+    fn get_ata(&self) -> &token::TokenAccount {
+        &self.beastie_ata
     }
 }

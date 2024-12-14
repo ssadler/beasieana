@@ -19,7 +19,8 @@ pub struct BoardConfig {
     pub min_radius: u16,
     pub max_radius: u16,
     pub width: u16,
-    pub height: u16
+    pub height: u16,
+    pub link_max_distance: u16
 }
 
 impl Board {
@@ -42,6 +43,14 @@ impl BoardConfig {
             false
         } else {
             true
+        }
+    }
+
+    pub fn link_effectiveness(&self, distance: u16) -> u8 {
+        if distance > self.link_max_distance {
+            0
+        } else {
+            255 - (distance * 255 / self.link_max_distance) as u8
         }
     }
 }

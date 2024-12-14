@@ -7,7 +7,7 @@ use crate::types::*;
 use anchor_spl::token::TokenAccount;
 use beastie_common::{byte_ref, Beastie, BOARD_KEY};
 
-use crate::{batteries::{defaultmap_get, defaultmap_modify}, state::{beastie::GridBeastie, board::Board}};
+use crate::state::{beastie::Cell, board::Board};
 
 
 
@@ -16,11 +16,11 @@ pub trait BillingContext<'info> : Sized {
     fn billing_board(&self) -> &Account<'info, Board>;
     fn billing_token_program(&self) -> AccountInfo<'info>;
     fn get_beastie(&self) -> &Account<'info, Beastie>;
-    fn get_placement(&mut self) -> &mut Account<'info, GridBeastie>;
+    fn get_placement(&mut self) -> &mut Account<'info, Cell>;
     fn beastie_ata(&self) -> &Account<'info, token::TokenAccount>;
     fn commit_balance<'a, 'b>(&mut self, amount: u64) -> Result<()> {
         let k = self.billing_board().key();
-        defaultmap_modify(&mut self.get_placement().commitments, k, |v| *v += amount);
+        self.get_placement().commitments.modify(k, |v| *v += amount);
         self.transfer_to_board(amount)
     }
     fn transfer_to_board<'a, 'b>(&'a self, amount: u64) -> Result<()> {
@@ -51,23 +51,22 @@ pub enum BillingResult {
 
 pub fn bill_beastie<'info, C: BillingContext<'info>>(ctx: &mut C) -> Result<BillingResult> {
 
+    let cell = ctx.get_placement().as_active();
     let height = Clock::get()?.slot;
-    let diff = height - ctx.get_placement().active.as_ref().map(|o| o.billed_height).unwrap_or(0);
+    let diff = height - cell.billed_height;
     if diff == 0 {
-        msg!("p is {}", ctx.get_placement().active.is_some());
         return Ok(BillingResult::Billed(0, 0));
     }
 
-    let mut p = ctx.get_placement().active.take().expect("Bill: beastie not active");
-    let mut due = p.rate * diff;
+    let mut due = cell.rate * diff;
 
 
     // first take from committed
     let board_key = ctx.billing_board().key();
-    let committed = defaultmap_get(&ctx.get_placement().commitments, &board_key);
+    let committed = ctx.get_placement().commitments.get(&board_key);
     if committed > 0 {
         let take_c = std::cmp::min(due, committed);
-        defaultmap_modify(&mut ctx.get_placement().commitments, board_key, |v| *v -= take_c);
+        ctx.get_placement().commitments.modify(board_key, |v| *v -= take_c);
         due -= take_c;
     }
 
@@ -79,13 +78,14 @@ pub fn bill_beastie<'info, C: BillingContext<'info>>(ctx: &mut C) -> Result<Bill
         ctx.transfer_to_board(take_t)?;
     }
 
+    let cell = ctx.get_placement().as_active_mut();
+    cell.billed_height = height;
+
     if due > 0 {
         msg!("Beastie is broke; removing");
+        cell.deactivate()?;
         return Ok(BillingResult::Broke);
     }
-
-    p.billed_height = height;
-    ctx.get_placement().active.replace(p);
 
     Ok(BillingResult::Billed(0, 0))
 }
@@ -111,7 +111,7 @@ pub fn start_billing<'c, 'info, C: BillingContext<'info>>(ctx: &mut C, pos: Cell
     }
     
     // Check placement is None
-    if ctx.get_placement().active.is_some() {
+    if ctx.get_placement().is_active() {
         panic!("placement is active");
     }
 
@@ -130,27 +130,32 @@ pub fn start_billing<'c, 'info, C: BillingContext<'info>>(ctx: &mut C, pos: Cell
         board: ctx.billing_board().key(),
         billed_height: Clock::get()?.slot,
         rate: ctx.billing_board().get_billing_rate(&pos),
-        pos: pos.clone()
+        pos: pos.clone(),
+        linked_balance: 0
     };
-    ctx.get_placement().active.replace(p);
+    ctx.get_placement().activate(p);
 
     Ok(())
 }
 
 
-pub fn stop_billing<'c, 'info, C: BillingContext<'info>>(mut ctx: C) -> Result<()> where 'c: 'info {
-    panic!("stop_billing");
-    //TODO
+pub fn stop_billing<'c, 'info, C: BillingContext<'info>>(mut ctx: &C) -> Result<()> where 'c: 'info {
+    Ok(())
+    // TODO   (the below Revoke should be correct)
+
     //let revocation = CpiContext::new(
-    //    ctx.accounts.token_program.to_account_info(),
+    //    ctx.billing_token_program(),
     //    token::Revoke {
-    //        source: ctx.accounts.board_ata.to_account_info(),
-    //        authority: ctx.accounts.board.to_account_info()
+    //        source: ctx.beastie_ata().to_account_info(),
+    //        authority: ctx.get_beastie().to_account_info()
     //    }
     //);
     //token::revoke(revocation)?;
 
     //let placement = ctx.accounts.placement.active.take().expect("no placement?");
 }
+
+
+
 
 

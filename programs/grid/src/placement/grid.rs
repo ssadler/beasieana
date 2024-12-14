@@ -1,6 +1,6 @@
 
 use anchor_lang::prelude::*;
-use crate::remaining_accounts::{InitPDA, RemainingAccounts};
+use crate::remaining_accounts::{InitPDA, RemainingAccounts, CTX};
 use crate::state::pad;
 use crate::{types::*, BillingContext};
 use crate::placement::context::*;
@@ -12,11 +12,9 @@ use super::interaction::interact;
 const RAD_MAX: u16 = 500;
 
 pub fn place_beastie_on_grid<'info>(
-    ctx: &mut Context<'_, '_, '_, 'info, PlacementContext<'info>>,
-    vra: &mut RemainingAccounts<'info>,
+    ctx: &mut CTX<'_, '_, '_, 'info, PlacementContext<'info>>,
     cell: CellPositionedId
 ) -> Result<()> {
-
 
     if cell.pos.r > RAD_MAX {
         panic!("RAD_MAX is 500");
@@ -29,7 +27,7 @@ pub fn place_beastie_on_grid<'info>(
 
     for pad_id in cell.pos.pads(9) {
         let init = Some((&ctx.accounts.payer, 10240));
-        let mut pad = load_pad_storage(vra, pad_id, init);
+        let mut pad = load_pad_storage(&ctx.rem, pad_id, init);
         let mut idx = 0;
         while idx < pad.len() {
             let other = pad.get(idx);
@@ -39,7 +37,7 @@ pub fn place_beastie_on_grid<'info>(
                     panic!("already interacted");
                 }
                 interacted = true;
-                replace_interact(ctx, vra, &cell, other.clone())?;
+                replace_interact(ctx, &cell, other.clone())?;
             } else {
                 idx += 1;
             }
@@ -64,8 +62,7 @@ fn load_pad_storage<'info>(
 
 
 fn replace_interact<'c, 'info>(
-    ctx: &mut Context<'_, '_, 'c, 'info, PlacementContext<'info>>,
-    vra: &RemainingAccounts<'info>,
+    ctx: &mut CTX<'_, '_, 'c, 'info, PlacementContext<'info>>,
     cell: &CellPositionedId,
     mut other: CellPositionedId
 ) -> Result<()> {
@@ -75,10 +72,10 @@ fn replace_interact<'c, 'info>(
     }
 
     let old_pos = other.pos.clone();
-    other.pos = interact(ctx, vra, &cell.pos, &other)?;
+    other.pos = interact(ctx, &cell.pos, &other)?;
 
     for pad in old_pos.pads(9) {
-        let mut storage = load_pad_storage(vra, pad, None);
+        let mut storage = load_pad_storage(&ctx.rem, pad, None);
         if other.pos.overlaps_pad(pad, 9) {
             storage.update_cell(&other);
         } else {

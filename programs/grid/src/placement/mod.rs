@@ -3,38 +3,44 @@ mod context;
 mod grid;
 mod interaction;
 
+use std::ops::DerefMut;
+
 pub use context::*;
 pub use grid::*;
-use crate::billing;
+use crate::{billing, remaining_accounts::CTX};
 
 use anchor_lang::prelude::*;
 
-use crate::{remaining_accounts::RemainingAccounts, start_billing, BillingContext, CellPos};
+use crate::{start_billing, BillingContext, CellPos};
 
 
-pub fn place<'c, 'info>(mut ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> where 'c: 'info {
-
-    let mut vra = RemainingAccounts::new(ctx.remaining_accounts);
-    start_billing(&mut ctx, pos)?;
+pub fn place<'c, 'info>(ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>, pos: CellPos) -> Result<()> where 'c: 'info {
+    let mut ctx = CTX::new(ctx);
+    start_billing(ctx.deref_mut(), pos)?;
     let cell = crate::CellPositionedId { cell_id: ctx.get_placement().cell_id, pos };
-    place_beastie_on_grid(&mut ctx, &mut vra, cell)
+    place_beastie_on_grid(&mut ctx, cell)
 }
 
 
-pub fn remove<'c, 'info>(mut ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
-    // TODO: Bill
-    let mut vra = RemainingAccounts::new(ctx.remaining_accounts);
-    let cell = ctx.get_placement().get_active().get_cell();
-    remove_beastie_from_grid(&mut vra, cell)
+pub fn remove<'c, 'info>(ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
+    let mut ctx = CTX::new(ctx);
+    _remove(&mut ctx)?;
+    billing::stop_billing(ctx.deref_mut());
+    Ok(())
 }
 
 
-pub fn bill<'c, 'info>(&mut ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
-    let r = billing::bill_beastie(ctx);
+pub fn bill_or_remove<'c, 'info>(ctx: &mut CTX<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<billing::BillingResult> where 'c: 'info {
+    let r = billing::bill_beastie(ctx.deref_mut())?;
     if r == billing::BillingResult::Broke {
-        let cell = ctx.get_placement().get_active().get_cell();
-        remove_beastie_from_grid(&mut vra, cell)
-
-
+        _remove(ctx);
     }
+    Ok(r)
 }
+
+
+fn _remove<'c, 'info>(ctx: &mut CTX<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
+    let cell = ctx.get_placement().as_active().get_cell();
+    remove_beastie_from_grid(&mut ctx.rem, cell)
+}
+

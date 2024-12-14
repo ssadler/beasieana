@@ -99,6 +99,12 @@ impl CellPos {
             .filter(move |(xx,yy)| self.overlaps_pad((*xx, *yy), g))
     }
 
+    pub fn distance(&self, other: &CellPos) -> f32 {
+        let dx = self.x as f32 - other.x as f32;
+        let dy = self.y as f32 - other.y as f32;
+        (dx * dx + dy * dy).sqrt()
+    }
+
     pub fn distance_squared(&self, other: &CellPos) -> u32 {
         let dx = self.x as i32 - other.x as i32;
         let dy = self.y as i32 - other.y as i32;

@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 declare_id!("EExeRoQMrfcJP28XQVjcE6khh3U8GC2RVZs28RNut5Br");
 
 mod remaining_accounts;
-mod batteries;
 mod state;
 mod placement;
 mod global;
@@ -12,18 +11,22 @@ mod board;
 mod beastie_create;
 mod admin;
 mod billing;
+mod links;
 
 pub use global::*;
 pub use board::*;
 pub use beastie_create::*;
 pub use admin::*;
-pub use placement::*;
 pub use types::*;
 pub use billing::*;
+use placement::*;
+use links::*;
+use state::beastie::Link;
 
 
 #[program]
 pub mod grid {
+    use state::beastie::Link;
     use types::CellPos;
     use beastie_common::{byte_ref, BOARD_KEY};
 
@@ -57,10 +60,6 @@ pub mod grid {
         Ok(())
     }
 
-    pub fn say(ctx: Context<SayHello>, sayit: String) -> Result<String> {
-        Ok(sayit)
-    }
-
     pub fn admin_init(ctx: Context<AdminInit>) -> Result<()> {
         ctx.accounts.global.admin = ctx.accounts.admin.key();
         Ok(())
@@ -74,20 +73,37 @@ pub mod grid {
         placement::place(ctx, pos)
     }
 
-    pub fn remove<'c, 'info>(mut ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
+    pub fn remove<'c, 'info>(ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>) -> Result<()> where 'c: 'info {
         placement::remove(ctx)
     }
 
-    pub fn bill<'info>(mut ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>) -> Result<bool> {
-        Ok(false)
-        //let r = bill_beastie(&mut ctx)?;
-        //if r == BillingResult::Broke {
-        //    remove_beastie_from_board(ctx)?;
-        //    Ok(false)
-        //} else {
-        //    Ok(true)
-        //}
+    pub fn create_links<'c, 'info>(
+        mut ctx: Context<'_, '_, 'c, 'info, LinksContext<'info>>,
+        links: Vec<Link>
+    ) -> Result<()> where 'c: 'info {
+        links::create_links(ctx, links)
     }
+
+    pub fn remove_links<'c, 'info>(
+        mut ctx: Context<'_, '_, 'c, 'info, LinksContext<'info>>,
+        cells: Vec<u32>
+    ) -> Result<()> where 'c: 'info {
+        links::remove_links(ctx, cells)
+    }
+
+    //pub fn bill<'info>(mut ctx: Context<'_, '_, '_, 'info, BillContext>) -> Result<()> {
+    //}
+
+    //pub fn bill<'info>(mut ctx: Context<'_, '_, '_, 'info, PlacementContext<'info>>) -> Result<bool> {
+    //    Ok(false)
+    //    //let r = bill_beastie(&mut ctx)?;
+    //    //if r == BillingResult::Broke {
+    //    //    remove_beastie_from_board(ctx)?;
+    //    //    Ok(false)
+    //    //} else {
+    //    //    Ok(true)
+    //    //}
+    //}
 }
 
 #[derive(Accounts)]

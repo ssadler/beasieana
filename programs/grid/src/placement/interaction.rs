@@ -1,17 +1,18 @@
 
+use std::ops::Deref;
+
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, TokenAccount};
+use anchor_spl::token;
 
-use crate::{batteries::defaultmap_get, state::beastie::GridBeastie, BillingContext, CellPos, CellPositionedId};
+use crate::{remaining_accounts::CTX, state::beastie::{ActiveCell, HasActiveBeastie}, CellPos, CellPositionedId};
 
-use super::{PlacementContext, RemainingAccounts};
+use super::PlacementContext;
 
 
 
 
 pub fn interact<'info>(
-    ctx: &mut Context<'_, '_, '_, 'info, PlacementContext<'info>>,
-    vra: &RemainingAccounts<'info>,
+    ctx: &mut CTX<'_, '_, '_, 'info, PlacementContext<'info>>,
     pos: &CellPos,
     other: &CellPositionedId
 ) -> Result<CellPos> 
@@ -23,15 +24,15 @@ pub fn interact<'info>(
         panic!("OCCUPIED");
     }
 
-    let other_beastie: Account<'info, GridBeastie> = Account::try_from(
-        vra.get_placement(other.cell_id, None).expect("error getting placement PDA in interact")
+    let other_beastie: Account<'info, ActiveCell> = Account::try_from(
+        ctx.rem.get_placement(other.cell_id, None).expect("error getting placement PDA in interact")
     )?;
-    let other_ata: Account<'info, TokenAccount> = Account::try_from(
-        vra.get_ata(&other_beastie.asset_address(), &ctx.accounts.board.token).expect("Error getting ATA in interact")
+    let other_ata: Account<'info, token::TokenAccount> = Account::try_from(
+        ctx.rem.get_ata(&other_beastie.asset_address(), &ctx.accounts.board.token).expect("Error getting ATA in interact")
     )?;
 
-    let sec = security_balance(&ctx.accounts.placement, &ctx.accounts.beastie_ata)?;
-    let other_sec = security_balance(&other_beastie, &other_ata)?;
+    let sec = ctx.accounts.beastie_security_balance()?;
+    let other_sec = (&*other_beastie, &*other_ata).beastie_security_balance()?;
 
     if sec < other_sec {
         panic!("low balance for shrink");
@@ -39,16 +40,11 @@ pub fn interact<'info>(
 
     // commit displacement
     let area_diff = other.pos.area() - new_pos.area();
-    let displacement = other_sec * area_diff / other.pos.area();
-    ctx.commit_balance(displacement)?;
+    panic!("displacement");
+    //let displacement = other_sec * area_diff / other.pos.area();
+    //ctx.commit_balance(displacement)?;
 
     Ok(new_pos)
-}
-
-fn security_balance(beastie: &GridBeastie, ata: &token::TokenAccount) -> Result<u64> {
-    let p = beastie.active.as_ref().unwrap();
-    let c = defaultmap_get(&beastie.commitments, &p.board);
-    Ok(c + ata.amount - p.get_due()?)
 }
 
 

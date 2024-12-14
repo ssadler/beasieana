@@ -1,7 +1,5 @@
 [workspace]
-members = [ "modules/account_macros", "modules/beastie_common",
-    "programs/*"
-]
+members = [ "modules/beastie_common", "programs/*" ]
 resolver = "2"
 
 [profile.release]
