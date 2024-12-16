@@ -9,6 +9,8 @@ use crate::CellPos;
 use crate::CellPositionedId;
 
 
+
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub struct Active;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
@@ -19,28 +21,31 @@ impl BeastieCellState for Active {}
 impl BeastieCellState for MaybeActive {}
 
 #[account]
-pub struct Cell<T: BeastieCellState = MaybeActive> {
+pub struct Cell<T: BeastieCellState + AnchorSerialize + AnchorDeserialize = MaybeActive> {
     pub cell_id: u32,
     active: Option<Placement>, // not a pub field
     pub incoming_links: u16,
     pub commitments: Commitments,
     pub links: Vec<EffectiveLink>,
-    _state: PhantomData<T>
+    _state: [T; 0]
 }
 
 pub type ActiveCell = Cell<Active>;
 
-impl<T: BeastieCellState> Cell<T> {
+impl<T: BeastieCellState + AnchorSerialize + AnchorDeserialize> Cell<T> {
     pub fn asset_address(&self) -> Pubkey {
         let seeds = [BEASTIE_KEY, byte_ref!(self.cell_id, 4)];
         let (addr, _) = Pubkey::find_program_address(&seeds, &BEASTIE_PROGRAM_ID);
         addr
     }
-    pub fn unapply_link(&mut self, link: &Link, effectiveness: u8) {
+    pub fn unapply_link(&mut self, elink: &EffectiveLink) {
         if let Some(p) = self.active.as_mut() {
-            p.linked_balance -= link.get_effect(effectiveness);
+            p.linked_balance -= elink.get_effect();
         }
         self.incoming_links -= 1;
+    }
+    pub fn is_active(&self) -> bool {
+        self.active.is_some()
     }
 }
 
@@ -53,9 +58,6 @@ impl Cell<MaybeActive> {
         assert!(self.active.is_some(), "as_active: not active");
         unsafe { &mut *(self as *mut Cell as *mut ActiveCell) }
     }
-    pub fn is_active(&self) -> bool {
-        self.active.is_some()
-    }
     pub fn activate(&mut self, p: Placement) {
         assert!(self.active.is_none(), "activate: already active");
         assert!(self.links.len() == 0, "activate: have links");
@@ -65,8 +67,8 @@ impl Cell<MaybeActive> {
 }
 
 impl ActiveCell {
-    pub fn apply_link(&mut self, link: &Link, effectiveness: u8) {
-        self.linked_balance += link.get_effect(effectiveness);
+    pub fn apply_link(&mut self, elink: &EffectiveLink) {
+        self.linked_balance += elink.get_effect();
         self.incoming_links += 1;
     }
     pub fn get_cell(&self) -> CellPositionedId {
@@ -111,8 +113,18 @@ impl Placement {
 }
 
 
-// Link effectiveness is (distance / config.link_max_distance * 255)
-pub type EffectiveLink = (Link, u8);
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
+pub struct EffectiveLink {
+    pub link: Link,
+    // Link effectiveness is (distance / config.link_max_distance * 255)
+    pub effectiveness: u8
+}
+impl EffectiveLink {
+    pub fn get_effect(&self) -> i64 {
+        self.link.get_effect(self.effectiveness)
+    }
+}
+
 
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
@@ -145,7 +157,7 @@ pub trait HasActiveBeastie {
     fn get_cell(&self) -> &ActiveCell;
     fn get_ata(&self) -> &token::TokenAccount;
     fn beastie_free_balance(&self) -> u64 {
-        self.get_ata().amount - self.get_cell().links.iter().map(|l| l.0.amount).sum::<u64>()
+        self.get_ata().amount - self.get_cell().links.iter().map(|l| l.link.amount).sum::<u64>()
     }
     fn beastie_security_balance(&self) -> Result<i64> {
         let cell = self.get_cell();

@@ -13,23 +13,20 @@ const wallet = provider.wallet as anchor.Wallet
 export const gridApp = anchor.workspace.Grid as anchor.Program<Grid>
 export const beastieApp = anchor.workspace.Beastie as anchor.Program<Beastie>
 
-let init = false
 
-export async function createBeastie(owner?: anchor.web3.PublicKey) {
+let next_cell_id = 1
+export async function createBeastie(owner?: anchor.web3.PublicKey, cell_id?: number) {
 
-  if (!init) {
-    await beastieApp.methods.initialize().rpc()
-    init = true
-  }
+  cell_id ??= next_cell_id++
 
   owner ||= wallet.publicKey
-  let call = beastieApp.methods.createBeastie(owner)
+  let call = beastieApp.methods.createBeastie(cell_id, owner)
   await call.rpc()
   let accts = await call.pubkeys()
   return {
-    placement: {
-      ...await gridApp.account.gridBeastie.fetch(accts.placement),
-      address: accts.placement
+    cell: {
+      ...await gridApp.account.cell.fetch(accts.cell),
+      address: accts.cell
     },
     beastie: await beastieApp.account.beastie.fetch(accts.beastie),
     address: accts.beastie

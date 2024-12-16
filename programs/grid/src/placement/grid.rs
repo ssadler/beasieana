@@ -2,7 +2,7 @@
 use anchor_lang::prelude::*;
 use crate::remaining_accounts::{InitPDA, RemainingAccounts, CTX};
 use crate::state::pad;
-use crate::{types::*, BillingContext};
+use crate::types::*;
 use crate::placement::context::*;
 
 use super::interaction::interact;
@@ -67,7 +67,7 @@ fn replace_interact<'c, 'info>(
     mut other: CellPositionedId
 ) -> Result<()> {
 
-    if cell.cell_id != ctx.get_cell().cell_id {
+    if cell.cell_id != ctx.accounts.cell.cell_id {
         panic!("unexpected interact");
     }
 

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, Mint};
+use anchor_spl::token::{TokenAccount, Token, Mint};
 use anchor_spl::associated_token::AssociatedToken;
 
 use crate::state::board::*;
@@ -24,7 +24,7 @@ pub struct CreateBoard<'info> {
         associated_token::mint = token_mint,
         associated_token::authority = board
     )]
-    pub board_ata: Account<'info, token::TokenAccount>,
+    pub board_ata: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     #[account(constraint = token_mint.key() == token)]

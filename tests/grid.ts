@@ -46,7 +46,8 @@ describe("grid", () => {
       height: 1024,
       addCellMinValue: new anchor.BN(100000),
       minRadius: 64,
-      maxRadius: 512
+      maxRadius: 512,
+      linkMaxDistance: 1024,
     }
     let call = gridApp.methods
       .createBoard(new anchor.BN(1), owner.publicKey, mint, config)
@@ -102,6 +103,7 @@ describe("grid", () => {
 
   it("Place beastie", async () => {
     let beastie = placed = await createBeastie()
+    beastie.cell.
     let { pads } = await placeBeastie(beastie, { x: 200, y: 200, r: 200 })
 
     let p = await provider.connection.getAccountInfo(pads[0].pubkey)

@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 
 declare_id!("EExeRoQMrfcJP28XQVjcE6khh3U8GC2RVZs28RNut5Br");
 
-mod remaining_accounts;
 mod state;
 mod placement;
 mod global;
@@ -12,6 +11,7 @@ mod beastie_create;
 mod admin;
 mod billing;
 mod links;
+mod remaining_accounts;
 
 pub use global::*;
 pub use board::*;
@@ -20,17 +20,27 @@ pub use admin::*;
 pub use types::*;
 pub use billing::*;
 use placement::*;
-use links::*;
 use state::beastie::Link;
 
 
 #[program]
 pub mod grid {
+    use remaining_accounts::CTX;
     use state::beastie::Link;
     use types::CellPos;
     use beastie_common::{byte_ref, BOARD_KEY};
 
     use super::*;
+
+    pub fn init_beastie(ctx: Context<InitBeastie>, cell_id: u32) -> Result<()> {
+        ctx.accounts.cell.cell_id = cell_id;
+        Ok(())
+    }
+
+    pub fn init_placement(ctx: Context<InitPlacementContext>) -> Result<()> {
+        ctx.accounts.cell.cell_id = ctx.accounts.beastie.cell_id;
+        Ok(())
+    }
 
     pub fn create_board(
         ctx: Context<CreateBoard>,
@@ -55,11 +65,6 @@ pub mod grid {
         Ok(())
     }
 
-    pub fn init_beastie(ctx: Context<InitBeastie>, cell_id: u32) -> Result<()> {
-        ctx.accounts.placement.cell_id = cell_id;
-        Ok(())
-    }
-
     pub fn admin_init(ctx: Context<AdminInit>) -> Result<()> {
         ctx.accounts.global.admin = ctx.accounts.admin.key();
         Ok(())
@@ -78,17 +83,25 @@ pub mod grid {
     }
 
     pub fn create_links<'c, 'info>(
-        mut ctx: Context<'_, '_, 'c, 'info, LinksContext<'info>>,
+        ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>,
         links: Vec<Link>
     ) -> Result<()> where 'c: 'info {
-        links::create_links(ctx, links)
+        let mut ctx = CTX::new(ctx);
+        for link in links {
+            links::create_link(&mut ctx, link)?;
+        }
+        Ok(())
     }
 
     pub fn remove_links<'c, 'info>(
-        mut ctx: Context<'_, '_, 'c, 'info, LinksContext<'info>>,
+        ctx: Context<'_, '_, 'c, 'info, PlacementContext<'info>>,
         cells: Vec<u32>
     ) -> Result<()> where 'c: 'info {
-        links::remove_links(ctx, cells)
+        let mut ctx = CTX::new(ctx);
+        for cell in cells {
+            links::remove_link(&mut ctx, cell)?;
+        }
+        Ok(())
     }
 
     //pub fn bill<'info>(mut ctx: Context<'_, '_, '_, 'info, BillContext>) -> Result<()> {
@@ -105,13 +118,3 @@ pub mod grid {
     //    //}
     //}
 }
-
-#[derive(Accounts)]
-pub struct SayHello<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-}
-
-
-
-
