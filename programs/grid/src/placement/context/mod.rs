@@ -14,8 +14,9 @@ use crate::state::beastie::*;
 pub struct PlacementContext<'info> {
     pub c: PlacementCommon<'info>,
     #[account(
-        seeds = [b"cell", cell.cell_id.to_le_bytes().as_ref()],
-        bump
+        seeds = [CELL_KEY, byte_ref!(cell.cell_id, 4)],
+        bump,
+        mut
     )]
     pub cell: Account<'info, Cell>,
     #[account(
@@ -46,7 +47,7 @@ pub struct InitPlacementContext<'info> {
     pub c: PlacementCommon<'info>,
     #[account(
         init_if_needed,
-        seeds = [b"cell", c.beastie.cell_id.to_le_bytes().as_ref()],
+        seeds = [CELL_KEY, byte_ref!(c.beastie.cell_id, 4)],
         space = 10240,
         payer = c.payer,
         bump

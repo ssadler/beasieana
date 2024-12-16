@@ -9,6 +9,11 @@ use crate::CellPos;
 use crate::CellPositionedId;
 
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub struct AA {
+    b: PhantomData<u64>
+}
+
 
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
@@ -21,13 +26,13 @@ impl BeastieCellState for Active {}
 impl BeastieCellState for MaybeActive {}
 
 #[account]
-pub struct Cell<T: BeastieCellState + AnchorSerialize + AnchorDeserialize = MaybeActive> {
+pub struct Cell<T: BeastieCellState = MaybeActive> {
     pub cell_id: u32,
     active: Option<Placement>, // not a pub field
     pub incoming_links: u16,
     pub commitments: Commitments,
     pub links: Vec<EffectiveLink>,
-    _state: [T; 0]
+    _state: PhantomData<T>
 }
 
 pub type ActiveCell = Cell<Active>;

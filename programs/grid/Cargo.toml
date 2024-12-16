@@ -17,9 +17,13 @@ no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
-anchor-spl = "0.30.1"
 beastie_common = { path = "../../modules/beastie_common" }
 spl-token = "4.0.3"
-anchor-lang-idl-spec = "0.1.0"
-anchor-lang-idl = { version = "0.1.1", features = ["build"] }
+anchor-lang = { path = "../../../anchor/lang", features = ["init-if-needed"] }
+anchor-lang-idl-spec = { path = "../../../anchor/idl/spec" }
+anchor-lang-idl = { path = "../../../anchor/idl" }
+anchor-spl = { path = "../../../anchor/spl" }
+#anchor-lang-idl-spec = "0.1.0"
+#anchor-lang-idl = { version = "0.1.1", features = ["build"] }
+#anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+#anchor-spl = "0.30.1"

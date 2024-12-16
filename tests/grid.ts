@@ -18,8 +18,8 @@ describe("grid", () => {
 
 
   it("Init Beastie", async () => {
-    let { placement } = await createBeastie()
-    assert.equal(placement.cellId, 1)
+    let { cell } = await createBeastie()
+    assert.equal(cell.cellId, 1)
   })
 
 
@@ -62,6 +62,21 @@ describe("grid", () => {
   type Placement = Awaited<ReturnType<typeof placeBeastie>>
   let placed: Beastie
 
+  function initPlacementCall(beastie: Beastie) {
+    return gridApp.methods
+      .initPlacement()
+      .accountsPartial({
+        c: {
+          beastie: beastie.address,
+          board,
+          tokenMint: mint,
+        },
+        cell: beastie.cell.address,
+        tokenMint: mint,
+        beastieAta: Token.getAssociatedTokenAddressSync(mint, beastie.address, true),
+      })
+  }
+
   async function placeBeastie(beastie: Beastie, pos: Pos, opts: { interacts?: Placement[] }={}) {
 
     let beastieATA = await Token.getOrCreateAssociatedTokenAccount(provider.connection, owner.payer, mint, beastie.address, true)
@@ -74,20 +89,26 @@ describe("grid", () => {
         ...pads,
         ...toAccountInfo((b) => b.beastie.address),
         ...toAccountInfo((b) => b.beastieATA.address),
-        ...toAccountInfo((b) => b.beastie.placement.address),
+        ...toAccountInfo((b) => b.beastie.cell.address),
       ]
 
     let placeCall = gridApp.methods
       .place(pos)
       .accountsPartial({
-        beastie: beastie.address,
-        placement: beastie.placement.address,
-        board,
-        tokenMint: mint
+        c: {
+          beastie: beastie.address,
+          board,
+          tokenMint: mint
+        },
+        cell: beastie.cell.address,
+        beastieAta: Token.getAssociatedTokenAddressSync(mint, beastie.address, true),
       })
       .remainingAccounts(remaining)
 
-    let r = await buildProxy(beastie.address, await placeCall.instruction()).rpc()
+    let initPlacement = buildProxy(beastie.address, await initPlacementCall(beastie).instruction())
+    let r = await buildProxy(beastie.address, await placeCall.instruction())
+      .preInstructions([await initPlacement.instruction()], true)
+      .rpc()
 
     //await new Promise((r) => setTimeout(r, 100))
     //let tx = await provider.connection.getTransaction(r, { commitment: 'confirmed' })
@@ -101,13 +122,18 @@ describe("grid", () => {
     }
   }
 
+  it("Init Placement", async () => {
+    let beastie = await createBeastie()
+    let call = initPlacementCall(beastie)
+    await buildProxy(beastie.address, await call.instruction()).rpc()
+  })
+
   it("Place beastie", async () => {
     let beastie = placed = await createBeastie()
-    beastie.cell.
     let { pads } = await placeBeastie(beastie, { x: 200, y: 200, r: 200 })
 
     let p = await provider.connection.getAccountInfo(pads[0].pubkey)
-    assert.deepEqual([...p.data.subarray(0, 14)], [1,0,0,0,2,0,0,0,200,0,200,0,200,0])
+    assert.deepEqual([...p.data.subarray(0, 14)], [1,0,0,0,beastie.cell.cellId,0,0,0,200,0,200,0,200,0])
   })
 
   it("Remove beastie", async () => {
@@ -116,23 +142,26 @@ describe("grid", () => {
     let removeCall = gridApp.methods
       .remove()
       .accountsPartial({
-        beastie: placed.address,
-        placement: placed.placement.address,
-        board,
-        tokenMint: mint
+        c: {
+          beastie: placed.address,
+          board,
+          tokenMint: mint
+        },
+        cell: placed.cell.address,
+        beastieAta: Token.getAssociatedTokenAddressSync(mint, placed.address, true),
       })
       .remainingAccounts(pads)
 
     let call = buildProxy(placed.address, await removeCall.instruction())
-    try {
+    //try {
       await call.rpc()
-    } catch (e) {
-      let txid = String(e).split(' ')[3]
-      let tx = await provider.connection.getTransaction(txid, {
-        commitment: "confirmed",
-      })
-      throw e
-    }
+    //} catch (e) {
+    //  let txid = String(e).split(' ')[3]
+    //  let tx = await provider.connection.getTransaction(txid, {
+    //    commitment: "confirmed",
+    //  })
+    //  throw e
+    //}
     for (let pad of pads) {
       let p = await provider.connection.getAccountInfo(pad.pubkey)
       assert.deepEqual([...p.data.subarray(0, 14)], [0,0,0,0,0,0,0,0,0,0,0,0,0,0])
