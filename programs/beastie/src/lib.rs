@@ -4,6 +4,7 @@ use beastie_common::*;
 mod proxy;
 mod transfer;
 
+use grid::program::Grid;
 use proxy::*;
 use transfer::*;
 
@@ -13,51 +14,63 @@ declare_id!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");
 
 #[program]
 pub mod beastie {
+
     use super::*;
 
-    pub fn create_beastie(ctx: Context<CreateBeastie>, cell_id: u32, owner: Pubkey) -> Result<()> {
-
+    pub fn create_beastie(ctx: Context<CreateBeastieContext>, cell_id: u32, owner: Pubkey) -> Result<()> {
         let beastie = &mut ctx.accounts.beastie;
+        beastie.creation_time = Clock::get()?.unix_timestamp;
         beastie.cell_id = cell_id;
-        beastie.creation_slot = Clock::get()?.slot;
         beastie.owner = owner;
 
-        // create beastie in grid
-
-        let seeds = [BEASTIE_KEY, byte_ref!(cell_id, 4), &[ctx.bumps.beastie]];
-        let signer_seeds = &[&seeds[..]];
+        // call to grid to init cell
+        let signer = &[BEASTIE_KEY, byte_ref!(cell_id, 4), &[ctx.bumps.beastie]];
+        let ssigner: &[&[&[u8]]] = &[signer];
         let cpi = CpiContext::new_with_signer(
             ctx.accounts.grid_program.to_account_info(),
-            grid::cpi::accounts::InitBeastie {
+            grid::cpi::accounts::InitCellContext {
                 beastie: beastie.to_account_info(),
-                payer: ctx.accounts.payer.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
                 cell: ctx.accounts.cell.to_account_info(),
+                payer: ctx.accounts.payer.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info()
             },
-            signer_seeds
+            ssigner
         );
-
-        grid::cpi::init_beastie(cpi, cell_id)
+        grid::cpi::init_cell(cpi, cell_id)
     }
 
     pub fn proxy<'info>(
-        ctx: Context<'_, '_, '_, 'info, ProxyCall<'info>>,
-        data: Vec<u8>,
+        ctx: Context<'_, '_, '_, 'info, MultiProxyContext<'info>>,
+        data: Vec<ProxyCall>,
     ) -> Result<()> {
-        crate::proxy::proxy(ctx, data)
+        crate::proxy::multi_proxy(ctx, data)
     }
 
-    pub fn transfer_ownership(ctx: Context<Transfer>, new_owner: Pubkey) -> Result<()> {
-        crate::transfer::transfer(ctx, new_owner)
+    pub fn transfer_ownership(ctx: Context<BeastieOwnerAction>, new_owner: Pubkey) -> Result<()> {
+        ctx.accounts.beastie.owner = new_owner;
+        Ok(())
+    }
+
+    pub fn give_notice(ctx: Context<BeastieOwnerAction>) -> Result<()> {
+        assert!(
+            ctx.accounts.beastie.notice_given_time.replace(Clock::get()?.unix_timestamp).is_none(),
+            "notice already given"
+        );
+        Ok(())
+    }
+
+    pub fn noop(ctx: Context<NoopContext>) -> Result<()> {
+        Ok(())
     }
 }
 
-use grid::program::Grid;
 
+#[derive(Accounts)]
+pub struct NoopContext {}
 
 #[derive(Accounts)]
 #[instruction(cell_id: u32, owner: Pubkey)]
-pub struct CreateBeastie<'info> {
+pub struct CreateBeastieContext<'info> {
     #[account(
         init,
         payer = payer,
@@ -67,18 +80,13 @@ pub struct CreateBeastie<'info> {
     )]
     pub beastie: Account<'info, Beastie>,
 
-    #[account(
-        mut,
-        seeds = [CELL_KEY, cell_id.to_le_bytes().as_ref()],
-        seeds::program = grid_program.key(),
-        bump
-    )]
-    /// CHECK: yep
+    #[account(mut)]
+    /// CHECK: Will be checked by Grid
     pub cell: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-    pub grid_program: Program<'info, Grid>,
-}
 
+    pub grid_program: Program<'info, Grid>,
+    pub system_program: Program<'info, System>,
+}

@@ -1,8 +1,6 @@
 
 pub mod common;
 
-use std::marker::PhantomData;
-
 use common::*;
 use anchor_lang::{prelude::*, solana_program::{sysvar::rent::Rent, sysvar::Sysvar}};
 use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, Token}};
@@ -14,7 +12,7 @@ use crate::state::beastie::*;
 pub struct PlacementContext<'info> {
     pub c: PlacementCommon<'info>,
     #[account(
-        seeds = [CELL_KEY, byte_ref!(cell.cell_id, 4)],
+        seeds = [CELL_KEY, byte_ref!(c.beastie.cell_id, 4)],
         bump,
         mut
     )]
@@ -22,7 +20,8 @@ pub struct PlacementContext<'info> {
     #[account(
         associated_token::mint = c.token_mint,
         associated_token::authority = c.beastie,
-        constraint = beastie_ata.key() != c.board_ata.key()
+        constraint = beastie_ata.key() != c.board_ata.key(),
+        mut
     )]
     pub beastie_ata: Box<Account<'info, token::TokenAccount>>,
 }
@@ -46,10 +45,7 @@ impl<'info> HasActiveBeastie for PlacementContext<'info> {
 pub struct InitPlacementContext<'info> {
     pub c: PlacementCommon<'info>,
     #[account(
-        init_if_needed,
         seeds = [CELL_KEY, byte_ref!(c.beastie.cell_id, 4)],
-        space = 10240,
-        payer = c.payer,
         bump
     )]
     pub cell: Account<'info, Cell>,

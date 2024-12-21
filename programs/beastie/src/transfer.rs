@@ -3,7 +3,7 @@ use beastie_common::*;
 
 
 #[derive(Accounts)]
-pub struct Transfer<'info> {
+pub struct BeastieOwnerAction<'info> {
     #[account(
         seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         bump,
@@ -18,9 +18,3 @@ pub struct Transfer<'info> {
     pub payer: Signer<'info>,
 }
 
-
-
-pub fn transfer(ctx: Context<Transfer>, new_owner: Pubkey) -> Result<()> {
-    ctx.accounts.beastie.owner = new_owner;
-    Ok(())
-}

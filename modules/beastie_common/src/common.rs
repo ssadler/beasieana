@@ -6,9 +6,29 @@ declare_id!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");
 #[account]
 pub struct Beastie {
     pub cell_id: u32,
-    pub creation_slot: u64,
-    pub owner: Pubkey
+    pub creation_time: i64,
+    pub owner: Pubkey,
+    pub notice_given_time: Option<i64>,
 }
+
+const BEASTIE_NOTICE_TIME: i64 = 86400;
+
+impl Beastie {
+    pub fn notice_state(&self) -> Result<NoticeState> {
+        if let Some(t) = self.notice_given_time {
+            let passed = Clock::get()?.unix_timestamp - t > BEASTIE_NOTICE_TIME;
+            Ok(if passed { NoticeState::Fulfilled } else { NoticeState::Pending })
+        } else {
+            Ok(NoticeState::Inactive)
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub enum NoticeState {
+    Inactive, Pending, Fulfilled
+}
+
 
 pub mod macros {
     #[macro_export]

@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor"
-import { buildProxy, createBeastie } from './common'
+import { beastieApp, buildProxy, createBeastie, gridApp } from './common'
 import {assert, expect} from "chai";
 
 import * as Token from "@solana/spl-token";
@@ -9,9 +9,11 @@ describe("beastie", () => {
   anchor.setProvider(provider)
   const owner = provider.wallet as anchor.Wallet
 
+  let beastie
+
   it("Create Beastie", async () => {
 
-    let r = await createBeastie(owner.publicKey)
+    let r = beastie = await createBeastie(owner.publicKey)
     assert.equal(r.beastie.cellId, 1)
     assert.equal(r.beastie.owner.toString(), owner.publicKey.toString())
 
