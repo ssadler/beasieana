@@ -7,7 +7,8 @@ pub struct BeastieOwnerAction<'info> {
     #[account(
         seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         bump,
-        constraint = &beastie.owner == owner.key
+        constraint = &beastie.owner == owner.key,
+        mut
     )]
     pub beastie: Account<'info, Beastie>,
 

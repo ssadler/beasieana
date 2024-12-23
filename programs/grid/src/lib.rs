@@ -31,13 +31,13 @@ pub mod grid {
 
     use super::*;
 
-    pub fn init_placement(ctx: Context<InitPlacementContext>) -> Result<()> {
+    pub fn init_cell<'info>(ctx: Context<InitCellContext<'info>>) -> Result<()> {
         ctx.accounts.cell.cell_id = ctx.accounts.beastie.cell_id;
         Ok(())
     }
 
-    pub fn init_cell<'info>(ctx: Context<InitCellContext<'info>>, cell_id: u32) -> Result<()> {
-        ctx.accounts.cell.cell_id = cell_id;
+    pub fn init_placement(ctx: Context<InitPlacementContext>) -> Result<()> {
+        ctx.accounts.cell.cell_id = ctx.accounts.beastie.cell_id;
         Ok(())
     }
 
@@ -115,11 +115,10 @@ pub mod grid {
         Ok(())
     }
 
-    pub fn verify_not_active<'info>(ctx: Context<'_, '_, '_, 'info, VerifyNotActive<'info>>) -> Result<()> {
-        if ctx.accounts.cell.is_active() {
-            panic!("Beastie is active");
-        }
-        Ok(())
+    pub fn beastie_is_active<'info>(
+        ctx: Context<'_, '_, '_, 'info, BeastieIsActive<'info>>
+    ) -> Result<bool> {
+        Ok(ctx.accounts.cell.is_active())
     }
 
     pub fn noop<'info>(_ctx: Context<NoopContext<'info>>) -> Result<()> {
@@ -139,26 +138,19 @@ pub struct NoopContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(cell_id: u32)]
 pub struct InitCellContext<'info> {
-    /*
-     * The cell ID is provided as an arg to the instruction since the Beastie
-     * account data cannot be read yet since it's been created in the same
-     * instruction. This cannot however be called directly by a user since
-     * the cell has `init` and the Beastie contract will always call init.
-     */
     #[account(
         signer,
-        seeds = [BEASTIE_KEY, byte_ref!(cell_id, 4)],
+        seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         seeds::program = BEASTIE_PROGRAM_ID,
         bump
     )]
-    pub beastie: Signer<'info>,
+    pub beastie: Account<'info, Beastie>,
     #[account(
         init,
         payer = payer,
         space = 4096,
-        seeds = [CELL_KEY, byte_ref!(cell_id, 4)],
+        seeds = [CELL_KEY, byte_ref!(beastie.cell_id, 4)],
         bump
     )]
     pub cell: Account<'info, Cell>,
@@ -168,18 +160,16 @@ pub struct InitCellContext<'info> {
 }
 
 #[derive(Accounts)]
-pub struct VerifyNotActive<'info> {
+pub struct BeastieIsActive<'info> {
     #[account(
-        signer,
         seeds = [BEASTIE_KEY, byte_ref!(beastie.cell_id, 4)],
         seeds::program = BEASTIE_PROGRAM_ID,
         bump
     )]
-    pub beastie: Box<Account<'info, Beastie>>,
+    pub beastie: Account<'info, Beastie>,
     #[account(
         seeds = [CELL_KEY, byte_ref!(beastie.cell_id, 4)],
-        bump,
-        mut
+        bump
     )]
     pub cell: Account<'info, Cell>
 }

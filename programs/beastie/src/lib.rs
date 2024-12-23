@@ -22,6 +22,7 @@ pub mod beastie {
         beastie.creation_time = Clock::get()?.unix_timestamp;
         beastie.cell_id = cell_id;
         beastie.owner = owner;
+        beastie.exit(ctx.program_id)?; // Write
 
         // call to grid to init cell
         let signer = &[BEASTIE_KEY, byte_ref!(cell_id, 4), &[ctx.bumps.beastie]];
@@ -36,7 +37,7 @@ pub mod beastie {
             },
             ssigner
         );
-        grid::cpi::init_cell(cpi, cell_id)
+        grid::cpi::init_cell(cpi)
     }
 
     pub fn proxy<'info>(
@@ -56,6 +57,27 @@ pub mod beastie {
             ctx.accounts.beastie.notice_given_time.replace(Clock::get()?.unix_timestamp).is_none(),
             "notice already given"
         );
+        Ok(())
+    }
+
+    pub fn system_override(ctx: Context<BeastieOwnerAction>, action: OverrideAction) -> Result<()> {
+
+        #[cfg(feature = "production")]
+        panic!("system override denied");
+
+        match action {
+            OverrideAction::SetNoticeFulfilled => {
+                let t = Clock::get()?.unix_timestamp;
+                ctx.accounts.beastie.notice_given_time.replace(t-100000);
+                ctx.accounts.beastie.exit(ctx.program_id)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn reset_notice(ctx: Context<BeastieOwnerAction>) -> Result<()> {
+        ctx.accounts.beastie.notice_given_time = None;
         Ok(())
     }
 
@@ -90,3 +112,10 @@ pub struct CreateBeastieContext<'info> {
     pub grid_program: Program<'info, Grid>,
     pub system_program: Program<'info, System>,
 }
+
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum OverrideAction {
+    SetNoticeFulfilled
+}
+

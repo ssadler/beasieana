@@ -16,7 +16,7 @@ const BEASTIE_NOTICE_TIME: i64 = 86400;
 impl Beastie {
     pub fn notice_state(&self) -> Result<NoticeState> {
         if let Some(t) = self.notice_given_time {
-            let passed = Clock::get()?.unix_timestamp - t > BEASTIE_NOTICE_TIME;
+            let passed = t + BEASTIE_NOTICE_TIME < Clock::get()?.unix_timestamp;
             Ok(if passed { NoticeState::Fulfilled } else { NoticeState::Pending })
         } else {
             Ok(NoticeState::Inactive)
@@ -24,7 +24,7 @@ impl Beastie {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum NoticeState {
     Inactive, Pending, Fulfilled
 }

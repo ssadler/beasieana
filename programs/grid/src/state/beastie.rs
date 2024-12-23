@@ -9,11 +9,6 @@ use crate::CellPos;
 use crate::CellPositionedId;
 
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub struct AA {
-    b: PhantomData<u64>
-}
-
 
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]

@@ -38,12 +38,12 @@ export async function createBeastie(owner?: anchor.web3.PublicKey, cell_id?: num
     beastie,
     cell
   })
-  await call.rpc()
-  let accts = await call.pubkeys()
   return {
+    cell_id,
+    txid: await call.rpc(),
     cell,
-    beastie: await beastieApp.account.beastie.fetch(accts.beastie),
-    address: accts.beastie
+    beastie: await beastieApp.account.beastie.fetch(beastie),
+    address: beastie
   }
 }
 
@@ -74,11 +74,12 @@ export function buildProxyMulti(
   beastie: anchor.web3.PublicKey,
   proxyCalls: CallBuilder[],
 ) {
-  let calls: Parameters<typeof beastieApp.methods.proxy>[0]
 
+  let allAccounts: anchor.web3.AccountMeta[] = [
+    { isSigner: false, isWritable: false, pubkey: beastie }
+  ]
 
-  let allAccounts: anchor.web3.AccountMeta[] = [{ isSigner: false, isWritable: false, pubkey: beastie }]
-  let getAccountIdx = (account: anchor.web3.AccountMeta) => {
+  function getAccountIdx(account: anchor.web3.AccountMeta) {
     let idx = allAccounts.findIndex((a) => String(a.pubkey) == String(account.pubkey))
     if (idx >= 0) {
       allAccounts[idx].isSigner ||= idx > 0 && account.isSigner
@@ -89,38 +90,35 @@ export function buildProxyMulti(
     return allAccounts.length - 1
   }
 
-  let initCalls = async () => {
-    calls = []
 
+  let runCalls = async () => {
     let instructions = await Promise.all(
       proxyCalls.map(async (p) => (
         p instanceof anchor.web3.TransactionInstruction ? p : await p.instruction()
       ))
     )
 
-    for (let instruction of instructions) {
-      let accounts: number[] = []
-      for (let a of instruction.keys) {
-        let idx = getAccountIdx(a)
-        idx |= (a.isWritable ? 64 : 0) | (a.isSigner ? 128 : 0);
-        accounts.push(idx)
-      }
-      calls.push({
+    return instructions.map((instruction) => {
+      let accounts = instruction.keys.map((a) => 
+        getAccountIdx(a) | (a.isWritable ? 64 : 0) | (a.isSigner ? 128 : 0)
+      )
+      return {
         accounts: Buffer.from(accounts),
         data: instruction.data,
         programIdx: getAccountIdx({ pubkey: instruction.programId, isSigner: false, isWritable: false })
-      })
-    }
+      }
+    })
   }
+
+  let pcalls = runCalls()
 
   return {
     rpc: async () => {
-      if (!calls) await initCalls()
-      return beastieApp.methods.proxy(calls).remainingAccounts(allAccounts).rpc()
+      let calls = await pcalls
+      return beastieApp.methods.proxy(await pcalls).remainingAccounts(allAccounts).rpc()
     },
     prepare: async () => {
-      if (!calls) await initCalls()
-      return beastieApp.methods.proxy(calls).remainingAccounts(allAccounts).prepare()
+      return beastieApp.methods.proxy(await pcalls).remainingAccounts(allAccounts).prepare()
     }
   }
 }

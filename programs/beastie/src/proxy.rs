@@ -61,16 +61,19 @@ pub fn multi_proxy<'info>(
         assert!(p.accounts[0] & 63 == 0, "Preflight first account must be beastie");
         if p.data == (grid::instruction::BillMe {}).data() {
             run_call(p.clone())?;
-            let (_, r) = program::get_return_data().expect("Invalid response from grid::billme");
-            assert!(r.len() == 1, "unexpected grid::billme return data");
-            if r[0] != 0 {
+            let active = read_return_bool()?;
+            if active {
                 p.data = grid::instruction::CheckMe {}.data();
                 return Ok(Some(p));
             }
-        } else if p.data == (grid::instruction::VerifyNotActive {}).data() {
+        } else if p.data == (grid::instruction::BeastieIsActive {}).data() {
             run_call(p)?;
+            let active = read_return_bool()?;
+            if active {
+                panic!("Preflight: beastie is active");
+            }
         } else {
-            panic!("Preflight call not BillMe or VerifyNotActive");
+            panic!("Preflight call unexpected instruction");
         }
         Ok(None)
     };
@@ -80,7 +83,6 @@ pub fn multi_proxy<'info>(
      */
     let has_ext = calls.iter().any(|c| get_program_id(c) != &GRID_PROGRAM_ID);
     let notice = beastie.notice_state()?;
-    assert!(notice != NoticeState::Pending, "cant proxy; notice pending");
     let do_checks = has_ext && notice != NoticeState::Fulfilled;
     let mut iter = calls.into_iter();
 
@@ -105,5 +107,13 @@ pub fn multi_proxy<'info>(
     }
 
     Ok(())
+}
+
+
+
+fn read_return_bool() -> Result<bool> {
+    let (_, r) = program::get_return_data().expect("Expected response from Grid");
+    assert!(r.len() == 1, "Expected boolean response len 1 from Grid");
+    Ok(r[0] != 0)
 }
 

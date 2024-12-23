@@ -1,7 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
-import { beastieApp, buildProxyMulti, createBeastie, globalPlacementContextAccounts, gridApp, placeBeastie } from './common'
+import { beastieAddress, beastieApp, buildProxyMulti, cellAddress, createBeastie, globalPlacementContextAccounts, gridApp, placeBeastie } from './common'
 import {assert} from "chai";
 
+
+let y = 900
 
 describe("proxy", () => {
   // Configure the client to use the local cluster.
@@ -61,7 +63,7 @@ describe("proxy", () => {
     }
   })
 
-  it("Fail when preflight call wrong", async () => {
+  it("External call fails when wrong preflight", async () => {
     let beastie = await createBeastie()
     let instr = gridApp.methods.noop()
       .accountsPartial({ beastie: beastie.address })
@@ -71,13 +73,15 @@ describe("proxy", () => {
       await buildProxyMulti(beastie.address, [instr, noop]).rpc()
       assert.fail("expected to fail with wrong preflight")
     } catch (e) {
-      assert.isTrue(e.logs[2].indexOf("Preflight call not BillMe or VerifyNotActive") >= 0)
+      assert.isTrue(e.logs[2].indexOf("Preflight call unexpected instruction") >= 0)
     }
   })
 
-  it("Succeed when VerifyNotActive and not active", async () => {
+  it("External call succeeds when cell not active", async () => {
     let beastie = await createBeastie()
-    let instr = gridApp.methods.verifyNotActive()
+
+    let instr = gridApp.methods
+      .beastieIsActive()
       .accountsPartial({ beastie: beastie.address, cell: beastie.cell })
     // need to provide a noop so that it's identified as ext
     let noop = beastieApp.methods.noop()
@@ -94,7 +98,8 @@ describe("proxy", () => {
         `Program ${beastieApp.programId} invoke [1]`,
         `Program log: Instruction: Proxy`,
         `Program ${gridApp.programId} invoke [2]`,
-        `Program log: Instruction: VerifyNotActive`,
+        `Program log: Instruction: BeastieIsActive`,
+        `Program return: ${gridApp.programId} AA==`,
         `Program ${gridApp.programId} success`,
         `Program ${beastieApp.programId} invoke [2]`,
         `Program log: Instruction: Noop`,
@@ -104,11 +109,11 @@ describe("proxy", () => {
     )
   })
 
-  it("Fail when VerifyNotActive and is active", async () => {
+  it("Fail when preflight not bill and is active", async () => {
     let beastie = await createBeastie()
-    await placeBeastie(beastie, { x: 100, y: 100, r: 90 })
+    await placeBeastie(beastie, { x: 100, y, r: 90 })
 
-    let instr = gridApp.methods.verifyNotActive()
+    let instr = gridApp.methods.beastieIsActive()
       .accountsPartial({ beastie: beastie.address, cell: beastie.cell })
     // need to provide a noop so that it's identified as ext
     let noop = beastieApp.methods.noop()
@@ -117,13 +122,13 @@ describe("proxy", () => {
       await buildProxyMulti(beastie.address, [instr, noop]).rpc()
       assert.fail("expected to fail with wrong preflight")
     } catch (e) {
-      assert.isTrue(e.logs[4].indexOf("\nBeastie is active") >= 0)
+      assert.isTrue(e.logs[7].indexOf("Preflight: beastie is active") >= 0)
     }
   })
 
   it("Succeed when active and preflight is correct", async () => {
     let beastie = await createBeastie()
-    await placeBeastie(beastie, { x: 300, y: 100, r: 90 })
+    await placeBeastie(beastie, { x: 300, y, r: 90 })
 
     let instr = gridApp.methods.billMe()
       .accountsPartial(globalPlacementContextAccounts(beastie))
@@ -154,6 +159,38 @@ describe("proxy", () => {
         `Program ${beastieApp.programId} success`,
       ]
     )
+  })
+
+  it("Fail proxy without preflight if notice is pending", async () => {
+    let beastie = await createBeastie()
+    await beastieApp.methods.giveNotice()
+      .accountsPartial({ beastie: beastie.address })
+      .rpc()
+
+    let noop = beastieApp.methods.noop()
+    try {
+      await buildProxyMulti(beastie.address, [noop]).rpc()
+      assert.fail("expected to fail with wrong preflight")
+    } catch (e) {
+      assert.isTrue(e.logs[2].indexOf("\nPreflight program must be grid") >= 0)
+    }
+  })
+
+  it("Succeed proxy without preflight if notice is fulfilled", async () => {
+    let beastie = await createBeastie()
+    await placeBeastie(beastie, { x: 500, y, r: 90 })
+    await beastieApp.methods
+      .systemOverride({ 'setNoticeFulfilled': {} })
+      .accountsPartial({ beastie: beastie.address })
+      .rpc()
+
+    let i = anchor.web3.SystemProgram.transfer({
+      fromPubkey: provider.wallet.publicKey,
+      toPubkey: beastie.address,
+      lamports: 1
+    })
+
+    await buildProxyMulti(beastie.address, [i]).rpc()
   })
 })
 
