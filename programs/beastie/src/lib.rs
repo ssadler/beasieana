@@ -59,6 +59,10 @@ pub mod beastie {
         );
         Ok(())
     }
+    pub fn clear_notice(ctx: Context<BeastieOwnerAction>) -> Result<()> {
+        ctx.accounts.beastie.notice_given_time = None;
+        Ok(())
+    }
 
     pub fn system_override(ctx: Context<BeastieOwnerAction>, action: OverrideAction) -> Result<()> {
 
@@ -69,7 +73,6 @@ pub mod beastie {
             OverrideAction::SetNoticeFulfilled => {
                 let t = Clock::get()?.unix_timestamp;
                 ctx.accounts.beastie.notice_given_time.replace(t-100000);
-                ctx.accounts.beastie.exit(ctx.program_id)?;
             }
         }
 
@@ -81,7 +84,7 @@ pub mod beastie {
         Ok(())
     }
 
-    pub fn noop(ctx: Context<NoopContext>) -> Result<()> {
+    pub fn noop(_ctx: Context<NoopContext>) -> Result<()> {
         Ok(())
     }
 }

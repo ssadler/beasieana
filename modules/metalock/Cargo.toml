@@ -1,0 +1,12 @@
+[package]
+name = "metalock"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anchor-lang = { path = "../../../anchor/lang" }
+
+
+[dev-dependencies]
+quickcheck = "1.0.3"
+quickcheck_macros = "1.0.0"

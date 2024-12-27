@@ -1,5 +1,5 @@
-
 use anchor_lang::prelude::*;
+//use crate::{resources::RS, Resources};
 
 declare_id!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");
 
@@ -7,9 +7,18 @@ declare_id!("8Gg4bD4regjmpvz2thxNkyjvPiyxUKTcLuLZpFh4XJpU");
 pub struct Beastie {
     pub cell_id: u32,
     pub creation_time: i64,
-    pub owner: Pubkey,
     pub notice_given_time: Option<i64>,
+    pub owner: Pubkey,
+    //pub resources: Resources,
 }
+
+impl Beastie {
+    pub fn init(&mut self, cell_id: u32, owner: Pubkey) {
+        self.cell_id = cell_id;
+        //self.resources.set(RS::Pubkey, "owner", owner);
+    }
+}
+
 
 const BEASTIE_NOTICE_TIME: i64 = 86400;
 
@@ -45,8 +54,6 @@ pub mod macros {
         };
     }
 
-
-
     #[macro_export]
     macro_rules! impl_deref {
         ( [$($impl_generics:tt)*], $type:ty, $target:ty, $field:tt) => {
@@ -77,11 +84,7 @@ pub mod macros {
     pub use impl_deref;
     pub use impl_deref_const;
 }
-
 pub use macros::*;
-
-
-use anchor_lang::prelude::Pubkey;
 
 
 pub static BEASTIE_KEY:          &[u8] = b"beastie";

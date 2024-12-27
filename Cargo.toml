@@ -1,5 +1,5 @@
 [workspace]
-members = [ "modules/beastie_common", "programs/*" ]
+members = [ "modules/beastie_common", "modules/metalock", "programs/*" ]
 resolver = "2"
 
 [profile.release]
